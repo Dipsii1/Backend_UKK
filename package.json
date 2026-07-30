@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch index.ts",
+    "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node index.js"
+    "start": "node src/index.js"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",
