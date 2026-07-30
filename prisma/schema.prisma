@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -10,4 +5,56 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+model roles {
+  id   BigInt @id @default(autoincrement())
+  name String @unique
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model countries {
+  id BigInt @id @default(autoincrement())
+
+  code String @unique
+  name String @unique
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  provinces provinces[]
+}
+
+model provinces {
+  id BigInt @id @default(autoincrement())
+
+  code String @unique
+  name String @unique
+
+  country_id BigInt
+  country    countries @relation(fields: [country_id], references: [id])
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  cities cities[]
+
+  @@index([country_id])
+}
+
+model cities {
+  id BigInt @id @default(autoincrement())
+
+  code String @unique
+  name String @unique
+
+  province_id BigInt
+  province    provinces @relation(fields: [province_id], references: [id])
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([province_id])
 }
