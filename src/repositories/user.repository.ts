@@ -25,10 +25,10 @@ export class UserRepository {
     });
   }
 
-  async findByUsername(username: string) {
-    return prisma.users.findFirst({
-      where: { email: username },
-      select: this.userSelect,
+  async findByEmail(email: string) {
+    return prisma.users.findUnique({
+      where: { email },
+      include: { role: true, userProfiles: true },
     });
   }
 
@@ -39,14 +39,12 @@ export class UserRepository {
   }
 
   async update(id: bigint, data: {
-    username?: string;
     email?: string;
     role_id?: bigint;
   }) {
     return prisma.users.update({
       where: { id },
       data: {
-        ...(data.username && { email: data.username }),
         ...(data.email && { email: data.email }),
         ...(data.role_id && { role_id: data.role_id }),
       },
@@ -57,6 +55,13 @@ export class UserRepository {
   async delete(id: bigint) {
     return prisma.users.delete({
       where: { id },
+    });
+  }
+
+  async updateFullName(id: bigint, full_name: string) {
+    return prisma.user_profiles.update({
+      where: { user_id: id },
+      data: { full_name },
     });
   }
 }

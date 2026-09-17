@@ -61,9 +61,9 @@ export class AuthService {
   async login(input: LoginInput): Promise<LoginResult> {
     const user = await this.userAuthRepo.findByEmail(input.email);
     if (!user || !(await comparePassword(input.password, user.password!))) {
-      throw new UnauthorizedError("Kredensial tidak valid");
+      throw new UnauthorizedError("Email Atau Password Salah");
     }
-    if (!user.is_active) throw new ForbiddenError("Akun tidak aktif");
+    if (!user.is_active) throw new ForbiddenError("Akun sudah tidak aktif");
     if (!user.email_verified) throw new ForbiddenError("Email belum diverifikasi");
 
     const profile = user.userProfiles?.[0];

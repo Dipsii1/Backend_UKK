@@ -24,6 +24,12 @@ export class UserController {
     sendSuccess(res, user, "Pengguna berhasil diperbarui");
   });
 
+  static updateProfile = asyncHandler(async (req: Request, res: Response) => {
+    const id = BigInt(req.params.id as string);
+    const user = await userService.updateProfile(id, req.body);
+    sendSuccess(res, user, "Profil berhasil diperbarui");
+  });
+
   static delete = asyncHandler(async (req: Request, res: Response) => {
     const id = BigInt(req.params.id as string);
     await userService.delete(id);

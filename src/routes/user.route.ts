@@ -8,6 +8,7 @@ router.use(requireAuth);
 
 router.get("/", UserController.getAll);
 router.get("/:id", UserController.getById);
+router.patch("/:id/profile", UserController.updateProfile);
 router.put("/:id", UserController.update);
 router.delete("/:id", UserController.delete);
 

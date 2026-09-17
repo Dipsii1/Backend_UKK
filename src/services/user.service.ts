@@ -14,9 +14,15 @@ export class UserService {
     return user;
   }
 
-  async update(id: bigint, data: { username?: string; email?: string; role_id?: bigint }) {
+  async update(id: bigint, data: { email?: string; role_id?: bigint }) {
     await this.getById(id);
     return this.userRepo.update(id, data);
+  }
+
+  async updateProfile(id: bigint, data: { full_name?: string }) {
+    await this.getById(id);
+    if (data.full_name) await this.userRepo.updateFullName(id, data.full_name);
+    return this.getById(id);
   }
 
   async delete(id: bigint) {
