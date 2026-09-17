@@ -1,10 +1,19 @@
-import { createServer } from "node:http";
+import cookieParser from "cookie-parser";
+import express from "express";
+import { env } from "./config/env.js";
+import { errorHandler } from "./middlewares/error.middleware.js";
+import authRouter from "./routes/auth.route.js";
 
-const port = Number(process.env.PORT ?? 3000);
+const app = express();
 
-const server = createServer((req, res) => {
-  res.writeHead(200, { "content-type": "application/json" });
-  res.end(JSON.stringify({ status: "ok" }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+
+app.use("/api/auth", authRouter);
+
+app.use(errorHandler);
+
+app.listen(env.PORT, () => {
+  console.log(`Server running at http://localhost:${env.PORT}`);
 });
-
-server.listen(port, () => console.log(`http://localhost:${port}`));

@@ -32,7 +32,29 @@ Validasi schema:
 npx prisma validate
 ```
 
+## Arsitektur
+
+Alur request mengikuti pola berlapis:
+
+```
+Controller  →  UserService  →  UserRepository  →  Prisma  →  PostgreSQL
+```
+
+- **Controller**: parsing HTTP, validasi input, mengirim response.
+- **Service**: business rules (hash password, JWT, aturan domain).
+- **Repository**: interaksi database via Prisma, dapat di-mock untuk unit test.
+- **Prisma**: ORM yang menghasilkan client di `src/generated/prisma`.
+
 ## Changelog
+
+### 2026-09-17 (auth refactor)
+
+- Refactor auth ke pola berlapis: Controller → UserService → UserRepository → Prisma.
+- Memisahkan tanggung jawab: controller hanya menangani HTTP; service menjalankan business rules; repository menjadi satu-satunya pintu ke database.
+- Membuat `UserRepository` dengan metode `findByEmail`, `findById`, `createBuyerUser`, `createRefreshToken`, `findRefreshToken`, `revokeRefreshToken`, dan `revokeAllUserRefreshTokens`.
+- Refactor `UserService` (auth service) untuk mengikuti pola `Controller → UserService → UserRepository → Prisma`.
+- `UserRepository` kini menyediakan semua operasi CRUD lengkap: `findAll`, `findById`, `findByUsername`, `findByEmail`, `create`, `update`, `delete`.
+- `UserService` memiliki metode `getAll`, `getById`, `register`, `login`, `getProfile`, `refresh`, `logout`.
 
 ### 2026-09-17
 

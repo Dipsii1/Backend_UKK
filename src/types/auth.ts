@@ -1,0 +1,49 @@
+export type RegisterInput = {
+  email: string;
+  password: string;
+  fullName: string;
+};
+
+export type RegisterResult = {
+  accessToken: string;
+  user: {
+    id: bigint;
+    email: string;
+    full_name: string;
+  };
+};
+
+export type LoginInput = {
+  email: string;
+  password: string;
+};
+
+export type LoginResult = {
+  accessToken: string;
+  refreshToken: string;
+  user: {
+    id: bigint;
+    email: string;
+    full_name: string;
+    role: string;
+  };
+};
+
+export type ProfileResult = {
+  id: bigint;
+  email: string;
+  role: string;
+  full_name: string | null;
+  phone: string | null;
+  gender: string | null;
+  birth_date: Date | null;
+  avatar: string | null;
+  address: string | null;
+  province_id: bigint | null;
+  city_id: bigint | null;
+};
+
+export type RefreshResult = {
+  accessToken: string;
+  refreshToken: string;
+};
