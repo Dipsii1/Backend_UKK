@@ -1,13 +1,18 @@
 import type { Request, Response, NextFunction } from "express";
-import { ZodError, type ZodType } from "zod";
+import { ZodError } from "zod";
+import { AppError, ValidationError } from "../utils/app-error.js";
 import { sendError } from "../utils/api-response.js";
 
-export const validate = (schema: ZodType) =>
+export const validate =
+  (schema: import("zod").ZodSchema) =>
   (req: Request, res: Response, next: NextFunction): void => {
     const result = schema.safeParse(req.body);
     if (!result.success) {
-      const errors = result.error.issues.map(({ path, message }) => ({ field: path.join("."), message }));
-      sendError(res, "Validation failed", 422, errors);
+      const errors = result.error.issues.map(({ path, message }) => ({
+        field: path.join("."),
+        message,
+      }));
+      next(new ValidationError("Validation failed", errors));
       return;
     }
     req.body = result.data;
@@ -20,20 +25,29 @@ export const errorHandler = (
   res: Response,
   _next: NextFunction,
 ): void => {
+  if (error instanceof ValidationError) {
+    sendError(res, error.message, error.statusCode, error.errors);
+    return;
+  }
+
   if (error instanceof ZodError) {
-    sendError(res, "Validation failed", 422, error.issues);
+    const errors = error.issues.map(({ path, message }) => ({
+      field: path.join("."),
+      message,
+    }));
+    sendError(res, "Validation failed", 422, errors);
+    return;
+  }
+
+  if (error instanceof AppError) {
+    sendError(res, error.message, error.statusCode);
     return;
   }
 
   if (error instanceof Error) {
-    const statusCode = error.message === "EMAIL_EXISTS" ? 409
-      : error.message === "INVALID_CREDENTIALS" || error.message === "INVALID_TOKEN" ? 401
-      : error.message === "ACCOUNT_SUSPENDED" ? 403
-      : error.message === "NOT_FOUND" ? 404
-      : 500;
-    sendError(res, statusCode === 500 ? "Internal server error" : error.message, statusCode);
+    sendError(res, "Internal server error", 500);
     return;
   }
 
-  sendError(res, "Internal server error");
+  sendError(res, "Internal server error", 500);
 };

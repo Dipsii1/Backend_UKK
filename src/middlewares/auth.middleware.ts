@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
-import { sendError } from "../utils/api-response.js";
+import { UnauthorizedError } from "../utils/app-error.js";
 
 declare global {
   namespace Express {
@@ -14,7 +14,7 @@ declare global {
 export const requireAuth = (req: Request, res: Response, next: NextFunction): void => {
   const token = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1];
   if (!token) {
-    sendError(res, "Authentication required", 401);
+    next(new UnauthorizedError("Authentication required"));
     return;
   }
 
@@ -23,6 +23,6 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction): vo
     req.userId = BigInt(payload.sub);
     next();
   } catch {
-    sendError(res, "Invalid or expired access token", 401);
+    next(new UnauthorizedError("Invalid or expired access token"));
   }
 };

@@ -2,6 +2,12 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
 import { UserRepository } from "../repositories/auth.repository.js";
+import {
+  NotFoundError,
+  ConflictError,
+  UnauthorizedError,
+  ForbiddenError,
+} from "../utils/app-error.js";
 import type {
   LoginInput,
   LoginResult,
@@ -32,13 +38,13 @@ export class UserService {
 
   async getById(id: bigint) {
     const user = await this.userRepository.findById(id);
-    if (!user) throw new Error("NOT_FOUND");
+    if (!user) throw new NotFoundError("User not found");
     return user;
   }
 
   async register(input: RegisterInput): Promise<RegisterResult> {
     const existingEmail = await this.userRepository.findByEmail(input.email);
-    if (existingEmail) throw new Error("EMAIL_EXISTS");
+    if (existingEmail) throw new ConflictError("Email already exists");
 
     const user = await this.userRepository.createBuyerUser({
       email: input.email,
@@ -55,9 +61,9 @@ export class UserService {
   async login(input: LoginInput): Promise<LoginResult> {
     const user = await this.userRepository.findByEmail(input.email);
     if (!user || !(await bcrypt.compare(input.password, user.password))) {
-      throw new Error("INVALID_CREDENTIALS");
+      throw new UnauthorizedError("Invalid credentials");
     }
-    if (!user.is_active) throw new Error("ACCOUNT_SUSPENDED");
+    if (!user.is_active) throw new ForbiddenError("Account suspended");
 
     const profile = await this.userRepository.findProfileByUserId(user.id);
     const refreshToken = await this.userRepository.createRefreshToken({
@@ -102,14 +108,16 @@ export class UserService {
     try {
       userId = BigInt((jwt.verify(oldRefreshToken, env.JWT_SECRET) as { sub: string }).sub);
     } catch {
-      throw new Error("INVALID_TOKEN");
+      throw new UnauthorizedError("Invalid or expired token");
     }
 
     const token = await this.userRepository.findRefreshToken(oldRefreshToken);
-    if (!token || token.revoked_at || token.expired_at < new Date()) throw new Error("INVALID_TOKEN");
+    if (!token || token.revoked_at || token.expired_at < new Date()) {
+      throw new UnauthorizedError("Invalid or expired token");
+    }
 
     const user = await this.getById(userId);
-    if (!user.is_active) throw new Error("INVALID_TOKEN");
+    if (!user.is_active) throw new ForbiddenError("Account suspended");
 
     await this.userRepository.revokeRefreshToken(token.id);
     const newToken = await this.userRepository.createRefreshToken({
