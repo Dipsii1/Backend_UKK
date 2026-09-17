@@ -24,7 +24,7 @@ export class UserRepository {
   async findByEmail(email: string) {
     return prisma.users.findUnique({
       where: { email },
-      include: { role: true },
+      include: { role: true, userProfiles: true },
     });
   }
 
@@ -105,14 +105,6 @@ export class UserRepository {
         data: {
           user_id: user.id,
           full_name: data.fullName,
-        },
-      });
-
-      await tx.refresh_tokens.create({
-        data: {
-          user_id: user.id,
-          token: crypto.randomUUID(),
-          expired_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         },
       });
 

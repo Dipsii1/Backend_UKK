@@ -65,8 +65,8 @@ export class UserService {
     }
     if (!user.is_active) throw new ForbiddenError("Account suspended");
 
-    const profile = await this.userRepository.findProfileByUserId(user.id);
-    const refreshToken = await this.userRepository.createRefreshToken({
+    const profile = user.userProfiles?.[0];
+    const refreshTokenRecord = await this.userRepository.createRefreshToken({
       userId: user.id,
       token: signRefreshToken(user.id),
       expiredAt: new Date(Date.now() + REFRESH_TTL_MS),
@@ -74,7 +74,7 @@ export class UserService {
 
     return {
       accessToken: signAccessToken(user.id),
-      refreshToken: refreshToken.token,
+      refreshToken: refreshTokenRecord.token,
       user: {
         public_id: user.public_id,
         email: user.email,
@@ -85,8 +85,10 @@ export class UserService {
   }
 
   async getProfile(userId: bigint): Promise<ProfileResult> {
-    const user = await this.getById(userId);
-    const profile = await this.userRepository.findProfileByUserId(userId);
+    const user = await this.userRepository.findById(userId);
+    if (!user) throw new NotFoundError("User not found");
+
+    const profile = user.userProfiles?.[0] ?? null;
 
     return {
       public_id: user.public_id,
