@@ -54,6 +54,23 @@ export class AuthService {
       fullName: input.fullName,
     });
 
+    const verifyToken = crypto.randomBytes(32).toString("hex");
+    await this.userAuthRepo.createEmailVerificationToken({
+      userId: user.id,
+      token: verifyToken,
+      expiredAt: new Date(Date.now() + RESET_TTL_MS),
+    });
+
+    try {
+      await sendMail({
+        to: user.email,
+        subject: "Verifikasi Email",
+        html: verifyEmailTemplate(`${env.CLIENT_URL}/verify-email?token=${verifyToken}`),
+      });
+    } catch {
+      // Error sudah tercatat di mailer; pendaftaran tetap berhasil.
+    }
+
     return {
       accessToken: signAccessToken(user.id),
       user: { public_id: user.public_id, email: user.email, full_name: input.fullName },
