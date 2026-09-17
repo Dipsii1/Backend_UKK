@@ -7,7 +7,7 @@ export type RegisterInput = {
 export type RegisterResult = {
   accessToken: string;
   user: {
-    id: bigint;
+    public_id: string;
     email: string;
     full_name: string;
   };
@@ -22,7 +22,7 @@ export type LoginResult = {
   accessToken: string;
   refreshToken: string;
   user: {
-    id: bigint;
+    public_id: string;
     email: string;
     full_name: string;
     role: string;
@@ -30,7 +30,7 @@ export type LoginResult = {
 };
 
 export type ProfileResult = {
-  id: bigint;
+  public_id: string;
   email: string;
   role: string;
   full_name: string | null;

@@ -54,7 +54,7 @@ export class UserService {
 
     return {
       accessToken: signAccessToken(user.id),
-      user: { id: user.id, email: user.email, full_name: input.fullName },
+      user: { public_id: user.public_id, email: user.email, full_name: input.fullName },
     };
   }
 
@@ -76,7 +76,7 @@ export class UserService {
       accessToken: signAccessToken(user.id),
       refreshToken: refreshToken.token,
       user: {
-        id: user.id,
+        public_id: user.public_id,
         email: user.email,
         full_name: profile?.full_name ?? "",
         role: user.role.name,
@@ -89,7 +89,7 @@ export class UserService {
     const profile = await this.userRepository.findProfileByUserId(userId);
 
     return {
-      id: user.id,
+      public_id: user.public_id,
       email: user.email,
       role: user.role.name,
       full_name: profile?.full_name ?? null,

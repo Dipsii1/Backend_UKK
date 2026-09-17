@@ -9,6 +9,12 @@ export interface ApiResponse<T = unknown> {
   errors?: unknown;
 }
 
+const json = (res: Response, statusCode: number, body: ApiResponse): void => {
+  res.status(statusCode).type("json").send(JSON.stringify(body, (_, value) =>
+    typeof value === "bigint" ? value.toString() : value,
+  ));
+};
+
 export function sendSuccess<T>(res: Response, data: T, message = "Success", statusCode = 200) {
   const body: ApiResponse<T> = {
     success: true,
@@ -17,7 +23,7 @@ export function sendSuccess<T>(res: Response, data: T, message = "Success", stat
     message,
     data,
   };
-  res.status(statusCode).json(body);
+  json(res, statusCode, body);
 }
 
 export function sendError(
@@ -34,5 +40,5 @@ export function sendError(
     message,
     errors,
   };
-  res.status(statusCode).json(body);
+  json(res, statusCode, body);
 }
