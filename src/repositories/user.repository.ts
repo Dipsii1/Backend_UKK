@@ -1,23 +1,34 @@
 import { prisma } from "../config/database.js";
 
 export class UserRepository {
+  private userSelect = {
+    id: true,
+    public_id: true,
+    email: true,
+    is_active: true,
+    created_at: true,
+    updated_at: true,
+    role: { select: { name: true } },
+    userProfiles: true,
+  } as const;
+
   async findAll() {
     return prisma.users.findMany({
-      include: { role: true, userProfiles: true },
+      select: this.userSelect,
     });
   }
 
   async findById(id: bigint) {
     return prisma.users.findUnique({
       where: { id },
-      include: { role: true, userProfiles: true },
+      select: this.userSelect,
     });
   }
 
   async findByUsername(username: string) {
     return prisma.users.findFirst({
       where: { email: username },
-      include: { role: true, userProfiles: true },
+      select: this.userSelect,
     });
   }
 
@@ -39,6 +50,7 @@ export class UserRepository {
         ...(data.email && { email: data.email }),
         ...(data.role_id && { role_id: data.role_id }),
       },
+      select: this.userSelect,
     });
   }
 

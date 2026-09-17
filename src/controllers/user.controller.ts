@@ -9,24 +9,24 @@ const userService = new UserService(new UserRepository());
 export class UserController {
   static getAll = asyncHandler(async (_req: Request, res: Response) => {
     const users = await userService.getAll();
-    sendSuccess(res, users, "Users retrieved");
+    sendSuccess(res, users, "Pengguna berhasil diambil");
   });
 
   static getById = asyncHandler(async (req: Request, res: Response) => {
     const id = BigInt(req.params.id as string);
     const user = await userService.getById(id);
-    sendSuccess(res, user, "User retrieved");
+    sendSuccess(res, user, "Pengguna berhasil diambil");
   });
 
   static update = asyncHandler(async (req: Request, res: Response) => {
     const id = BigInt(req.params.id as string);
     const user = await userService.update(id, req.body);
-    sendSuccess(res, user, "User updated");
+    sendSuccess(res, user, "Pengguna berhasil diperbarui");
   });
 
   static delete = asyncHandler(async (req: Request, res: Response) => {
     const id = BigInt(req.params.id as string);
     await userService.delete(id);
-    sendSuccess(res, null, "User deleted");
+    sendSuccess(res, null, "Pengguna berhasil dihapus");
   });
 }

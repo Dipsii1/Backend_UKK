@@ -34,16 +34,37 @@ npx prisma validate
 
 ## Arsitektur
 
-Alur request mengikuti pola berlapis:
+Alur request mengikuti pola berlapis (bahasa Indonesia):
 
 ```
-Controller  →  UserService  →  AuthRepository  →  Prisma  →  PostgreSQL
+Controller  →  Service  →  Repository  →  Prisma  →  PostgreSQL
 ```
 
 - **Controller**: parsing HTTP, validasi input, mengirim response.
-- **Service**: business rules (hash password, JWT, aturan domain).
+- **Service**: aturan bisnis (hash password, JWT, validasi domain).
 - **Repository**: interaksi database via Prisma, dapat di-mock untuk unit test.
 - **Prisma**: ORM yang menghasilkan client di `src/generated/prisma`.
+
+## Endpoint Auth
+
+| Method | Path | Keterangan |
+|--------|------|------------|
+| POST | /api/auth/register | Registrasi akun baru |
+| POST | /api/auth/login | Login (mengirim refresh_token sebagai cookie) |
+| GET | /api/auth/me | Profil pengguna (butuh token) |
+| POST | /api/auth/refresh-token | Refresh access token |
+| POST | /api/auth/logout | Logout |
+| POST | /api/auth/reset-password/request | Request reset kata sandi (email) |
+| POST | /api/auth/reset-password/confirm | Konfirmasi reset kata sandi |
+
+## Endpoint User (admin)
+
+| Method | Path | Keterangan |
+|--------|------|------------|
+| GET | /api/users | Daftar semua pengguna |
+| GET | /api/users/:id | Detail pengguna by ID |
+| PUT | /api/users/:id | Update pengguna |
+| DELETE | /api/users/:id | Hapus pengguna |
 
 ## Changelog
 

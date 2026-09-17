@@ -10,7 +10,7 @@ export class UserService {
 
   async getById(id: bigint) {
     const user = await this.userRepo.findById(id);
-    if (!user) throw new NotFoundError("User not found");
+    if (!user) throw new NotFoundError("Pengguna tidak ditemukan");
     return user;
   }
 

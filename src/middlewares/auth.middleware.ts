@@ -14,7 +14,7 @@ declare global {
 export const requireAuth = (req: Request, res: Response, next: NextFunction): void => {
   const token = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1];
   if (!token) {
-    next(new UnauthorizedError("Authentication required"));
+    next(new UnauthorizedError("Autentikasi diperlukan"));
     return;
   }
 
@@ -23,6 +23,6 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction): vo
     req.userId = BigInt(payload.sub);
     next();
   } catch {
-    next(new UnauthorizedError("Invalid or expired access token"));
+    next(new UnauthorizedError("Token tidak valid atau sudah kadaluarsa"));
   }
 };

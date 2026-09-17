@@ -23,7 +23,9 @@ import type {
 const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const RESET_TTL_MS = 1 * 60 * 60 * 1000;
 
+// hash password
 const hashPassword = (password: string) => bcrypt.hash(password, env.BCRYPT_SALT_ROUNDS);
+// compare password
 const comparePassword = (password: string, hash: string) => bcrypt.compare(password, hash);
 
 const signAccessToken = (userId: bigint) =>
@@ -36,12 +38,13 @@ const signRefreshToken = (userId: bigint) =>
     expiresIn: env.JWT_REFRESH_EXPIRES_IN as jwt.SignOptions["expiresIn"],
   });
 
+
 export class AuthService {
   constructor(private readonly userAuthRepo: UserAuthRepository = new UserAuthRepository()) {}
 
   async register(input: RegisterInput): Promise<RegisterResult> {
     const existingEmail = await this.userAuthRepo.findByEmail(input.email);
-    if (existingEmail) throw new ConflictError("Email already exists");
+    if (existingEmail) throw new ConflictError("Email sudah terdaftar");
 
     const user = await this.userAuthRepo.createBuyerUser({
       email: input.email,
@@ -58,9 +61,10 @@ export class AuthService {
   async login(input: LoginInput): Promise<LoginResult> {
     const user = await this.userAuthRepo.findByEmail(input.email);
     if (!user || !(await comparePassword(input.password, user.password!))) {
-      throw new UnauthorizedError("Invalid credentials");
+      throw new UnauthorizedError("Kredensial tidak valid");
     }
-    if (!user.is_active) throw new ForbiddenError("Account suspended");
+    if (!user.is_active) throw new ForbiddenError("Akun tidak aktif");
+    if (!user.email_verified) throw new ForbiddenError("Email belum diverifikasi");
 
     const profile = user.userProfiles?.[0];
     const refreshTokenRecord = await this.userAuthRepo.createRefreshToken({
@@ -83,7 +87,7 @@ export class AuthService {
 
   async getProfile(userId: bigint): Promise<ProfileResult> {
     const user = await this.userAuthRepo.findById(userId);
-    if (!user) throw new NotFoundError("User not found");
+    if (!user) throw new NotFoundError("Pengguna tidak ditemukan");
 
     const profile = user.userProfiles?.[0] ?? null;
 
@@ -107,16 +111,16 @@ export class AuthService {
     try {
       userId = BigInt((jwt.verify(oldRefreshToken, env.JWT_SECRET) as { sub: string }).sub);
     } catch {
-      throw new UnauthorizedError("Invalid or expired token");
+      throw new UnauthorizedError("Token tidak valid atau sudah kadaluarsa");
     }
 
     const token = await this.userAuthRepo.findRefreshToken(oldRefreshToken);
     if (!token || token.revoked_at || token.expired_at < new Date()) {
-      throw new UnauthorizedError("Invalid or expired token");
+      throw new UnauthorizedError("Token tidak valid atau sudah kadaluarsa");
     }
 
     const user = await this.userAuthRepo.findById(userId);
-    if (!user?.is_active) throw new ForbiddenError("Account suspended");
+    if (!user?.is_active) throw new ForbiddenError("Akun tidak aktif");
 
     await this.userAuthRepo.revokeRefreshToken(token.id);
     const newToken = await this.userAuthRepo.createRefreshToken({
@@ -134,7 +138,7 @@ export class AuthService {
 
   async requestPasswordReset(email: string): Promise<ResetPasswordResult> {
     const user = await this.userAuthRepo.findByEmail(email);
-    if (!user) throw new NotFoundError("User not found");
+    if (!user) throw new NotFoundError("Pengguna tidak ditemukan");
 
     const resetToken = crypto.randomBytes(32).toString("hex");
     await this.userAuthRepo.createPasswordResetToken({
@@ -143,18 +147,18 @@ export class AuthService {
       expiredAt: new Date(Date.now() + RESET_TTL_MS),
     });
 
-    return { message: "Password reset token created" };
+    return { message: "Token reset kata sandi berhasil dibuat" };
   }
 
   async resetPassword(input: ResetPasswordInput): Promise<ResetPasswordResult> {
     const token = await this.userAuthRepo.findPasswordResetToken(input.token);
     if (!token || token.used_at || token.expired_at < new Date()) {
-      throw new UnauthorizedError("Invalid or expired reset token");
+      throw new UnauthorizedError("Token reset kata sandi tidak valid atau sudah kadaluarsa");
     }
 
     await this.userAuthRepo.updatePassword(token.user_id, await hashPassword(input.newPassword));
     await this.userAuthRepo.markPasswordResetUsed(token.id);
 
-    return { message: "Password reset successful" };
+    return { message: "Kata sandi berhasil direset" };
   }
 }

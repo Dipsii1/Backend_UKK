@@ -13,7 +13,7 @@ export const validate =
         field: path.join("."),
         message,
       }));
-      next(new ValidationError("Validation failed", errors));
+      next(new ValidationError("Validasi gagal", errors));
       return;
     }
     req.body = result.data;
@@ -44,7 +44,7 @@ export const errorHandler = (
       field: path.join("."),
       message,
     }));
-    sendError(res, "VALIDATION_ERROR", "Validation failed", 422, errors);
+    sendError(res, "VALIDATION_ERROR", "Validasi gagal", 422, errors);
     return;
   }
 
@@ -56,7 +56,6 @@ export const errorHandler = (
     return;
   }
 
-  // Legacy string errors (from services throwing "EMAIL_EXISTS" etc)
   if (error instanceof Error && error.message in knownErrorMap) {
     const mapped = knownErrorMap[error.message];
     if (env.NODE_ENV === "development") {
@@ -70,9 +69,9 @@ export const errorHandler = (
     if (env.NODE_ENV === "development") {
       console.error(`[INTERNAL_ERROR] ${req.method} ${req.path}:`, error);
     }
-    sendError(res, "INTERNAL_ERROR", "Internal server error", 500, env.NODE_ENV === "development" ? { name: error.name, message: error.message, stack: error.stack } : undefined);
+    sendError(res, "INTERNAL_ERROR", "Kesalahan server internal", 500, env.NODE_ENV === "development" ? { name: error.name, message: error.message, stack: error.stack } : undefined);
     return;
   }
 
-  sendError(res, "INTERNAL_ERROR", "Internal server error", 500);
-}
+  sendError(res, "INTERNAL_ERROR", "Kesalahan server internal", 500);
+};
