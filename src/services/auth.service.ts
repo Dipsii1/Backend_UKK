@@ -19,18 +19,18 @@ import type {
 
 const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-const signAccessToken = (userId: bigint) =>
+const signAccessToken = (userId: bigint): string =>
   jwt.sign({ sub: userId.toString() }, env.JWT_SECRET, {
     expiresIn: env.JWT_ACCESS_EXPIRES_IN as jwt.SignOptions["expiresIn"],
   });
 
-const signRefreshToken = (userId: bigint) =>
+const signRefreshToken = (userId: bigint): string =>
   jwt.sign({ sub: userId.toString() }, env.JWT_SECRET, {
     expiresIn: env.JWT_REFRESH_EXPIRES_IN as jwt.SignOptions["expiresIn"],
   });
 
 export class UserService {
-  constructor(private readonly userRepository: UserRepository) {}
+  constructor(private readonly userRepository: UserRepository = new UserRepository()) {}
 
   async getAll() {
     return this.userRepository.findAll();
@@ -126,7 +126,10 @@ export class UserService {
       expiredAt: new Date(Date.now() + REFRESH_TTL_MS),
     });
 
-    return { accessToken: signAccessToken(userId), refreshToken: newToken.token };
+    return {
+      accessToken: signAccessToken(userId),
+      refreshToken: newToken.token,
+    };
   }
 
   async logout(userId: bigint) {
