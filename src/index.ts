@@ -6,6 +6,7 @@ import { errorHandler } from "./middlewares/error.middleware.js";
 import authRouter from "./routes/auth.route.js";
 import userRouter from "./routes/user.route.js";
 import verifyEmailRouter from "./routes/verify-email.route.js";
+import resetPasswordRouter from "./routes/reset-password.route.js";
 
 const app = express();
 
@@ -16,6 +17,7 @@ app.use(cookieParser());
 app.use("/api/auth", authRouter);
 app.use("/api/users", userRouter);
 app.use("/api/verify-email", verifyEmailRouter);
+app.use("/api/reset-password", resetPasswordRouter);
 
 app.use(errorHandler);
 
