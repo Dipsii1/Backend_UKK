@@ -47,3 +47,12 @@ export type RefreshResult = {
   accessToken: string;
   refreshToken: string;
 };
+
+export type ResetPasswordInput = {
+  token: string;
+  newPassword: string;
+};
+
+export type ResetPasswordResult = {
+  message: string;
+};

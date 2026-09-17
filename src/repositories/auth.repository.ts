@@ -1,8 +1,9 @@
 import { prisma } from "../config/database.js";
 
-export class UserRepository {
-  async findAll() {
-    return prisma.users.findMany({
+export class UserAuthRepository {
+  async findByEmail(email: string) {
+    return prisma.users.findUnique({
+      where: { email },
       include: { role: true, userProfiles: true },
     });
   }
@@ -14,73 +15,7 @@ export class UserRepository {
     });
   }
 
-  async findByUsername(username: string) {
-    return prisma.users.findFirst({
-      where: { email: username },
-      include: { role: true, userProfiles: true },
-    });
-  }
-
-  async findByEmail(email: string) {
-    return prisma.users.findUnique({
-      where: { email },
-      include: { role: true, userProfiles: true },
-    });
-  }
-
-  async findByRole(roleId: bigint) {
-    return prisma.users.findMany({
-      where: { role_id: roleId },
-    });
-  }
-
-  async create(data: {
-    public_id: string;
-    role_id: bigint;
-    username: string;
-    email: string;
-    password: string;
-  }) {
-    return prisma.users.create({
-      data: {
-        public_id: data.public_id || crypto.randomUUID(),
-        role_id: data.role_id,
-        email: data.email,
-        password: data.password,
-      },
-    });
-  }
-
-  async update(
-    id: bigint,
-    data: {
-      username?: string;
-      email?: string;
-      role_id?: bigint;
-    }
-  ) {
-    return prisma.users.update({
-      where: { id },
-      data: {
-        ...(data.username && { email: data.username }),
-        ...(data.email && { email: data.email }),
-        ...(data.role_id && { role_id: data.role_id }),
-      },
-    });
-  }
-
-  async delete(id: bigint) {
-    return prisma.users.delete({
-      where: { id },
-    });
-  }
-
-  async findProfileByUserId(userId: bigint) {
-    return prisma.user_profiles.findUnique({
-      where: { user_id: userId },
-    });
-  }
-
+  // register (default: buyer)
   async createBuyerUser(data: {
     email: string;
     password: string;
@@ -137,6 +72,34 @@ export class UserRepository {
     return prisma.refresh_tokens.updateMany({
       where: { user_id: userId, revoked_at: null },
       data: { revoked_at: new Date() },
+    });
+  }
+
+  async createPasswordResetToken(data: { userId: bigint; token: string; expiredAt: Date }) {
+    return prisma.password_resets.create({
+      data: {
+        user_id: data.userId,
+        token: data.token,
+        expired_at: data.expiredAt,
+      },
+    });
+  }
+
+  async findPasswordResetToken(token: string) {
+    return prisma.password_resets.findUnique({ where: { token } });
+  }
+
+  async markPasswordResetUsed(id: bigint) {
+    return prisma.password_resets.update({
+      where: { id },
+      data: { used_at: new Date() },
+    });
+  }
+
+  async updatePassword(userId: bigint, password: string) {
+    return prisma.users.update({
+      where: { id: userId },
+      data: { password },
     });
   }
 }

@@ -1,7 +1,8 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import crypto from "node:crypto";
 import { env } from "../config/env.js";
-import { UserRepository } from "../repositories/auth.repository.js";
+import { UserAuthRepository } from "../repositories/auth.repository.js";
 import {
   NotFoundError,
   ConflictError,
@@ -15,40 +16,36 @@ import type {
   RefreshResult,
   RegisterInput,
   RegisterResult,
+  ResetPasswordInput,
+  ResetPasswordResult,
 } from "../types/auth.js";
 
 const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const RESET_TTL_MS = 1 * 60 * 60 * 1000;
 
-const signAccessToken = (userId: bigint): string =>
+const hashPassword = (password: string) => bcrypt.hash(password, env.BCRYPT_SALT_ROUNDS);
+const comparePassword = (password: string, hash: string) => bcrypt.compare(password, hash);
+
+const signAccessToken = (userId: bigint) =>
   jwt.sign({ sub: userId.toString() }, env.JWT_SECRET, {
     expiresIn: env.JWT_ACCESS_EXPIRES_IN as jwt.SignOptions["expiresIn"],
   });
 
-const signRefreshToken = (userId: bigint): string =>
+const signRefreshToken = (userId: bigint) =>
   jwt.sign({ sub: userId.toString() }, env.JWT_SECRET, {
     expiresIn: env.JWT_REFRESH_EXPIRES_IN as jwt.SignOptions["expiresIn"],
   });
 
-export class UserService {
-  constructor(private readonly userRepository: UserRepository = new UserRepository()) {}
-
-  async getAll() {
-    return this.userRepository.findAll();
-  }
-
-  async getById(id: bigint) {
-    const user = await this.userRepository.findById(id);
-    if (!user) throw new NotFoundError("User not found");
-    return user;
-  }
+export class AuthService {
+  constructor(private readonly userAuthRepo: UserAuthRepository = new UserAuthRepository()) {}
 
   async register(input: RegisterInput): Promise<RegisterResult> {
-    const existingEmail = await this.userRepository.findByEmail(input.email);
+    const existingEmail = await this.userAuthRepo.findByEmail(input.email);
     if (existingEmail) throw new ConflictError("Email already exists");
 
-    const user = await this.userRepository.createBuyerUser({
+    const user = await this.userAuthRepo.createBuyerUser({
       email: input.email,
-      password: await bcrypt.hash(input.password, env.BCRYPT_SALT_ROUNDS),
+      password: await hashPassword(input.password),
       fullName: input.fullName,
     });
 
@@ -59,14 +56,14 @@ export class UserService {
   }
 
   async login(input: LoginInput): Promise<LoginResult> {
-    const user = await this.userRepository.findByEmail(input.email);
-    if (!user || !(await bcrypt.compare(input.password, user.password))) {
+    const user = await this.userAuthRepo.findByEmail(input.email);
+    if (!user || !(await comparePassword(input.password, user.password!))) {
       throw new UnauthorizedError("Invalid credentials");
     }
     if (!user.is_active) throw new ForbiddenError("Account suspended");
 
     const profile = user.userProfiles?.[0];
-    const refreshTokenRecord = await this.userRepository.createRefreshToken({
+    const refreshTokenRecord = await this.userAuthRepo.createRefreshToken({
       userId: user.id,
       token: signRefreshToken(user.id),
       expiredAt: new Date(Date.now() + REFRESH_TTL_MS),
@@ -85,7 +82,7 @@ export class UserService {
   }
 
   async getProfile(userId: bigint): Promise<ProfileResult> {
-    const user = await this.userRepository.findById(userId);
+    const user = await this.userAuthRepo.findById(userId);
     if (!user) throw new NotFoundError("User not found");
 
     const profile = user.userProfiles?.[0] ?? null;
@@ -113,28 +110,51 @@ export class UserService {
       throw new UnauthorizedError("Invalid or expired token");
     }
 
-    const token = await this.userRepository.findRefreshToken(oldRefreshToken);
+    const token = await this.userAuthRepo.findRefreshToken(oldRefreshToken);
     if (!token || token.revoked_at || token.expired_at < new Date()) {
       throw new UnauthorizedError("Invalid or expired token");
     }
 
-    const user = await this.getById(userId);
-    if (!user.is_active) throw new ForbiddenError("Account suspended");
+    const user = await this.userAuthRepo.findById(userId);
+    if (!user?.is_active) throw new ForbiddenError("Account suspended");
 
-    await this.userRepository.revokeRefreshToken(token.id);
-    const newToken = await this.userRepository.createRefreshToken({
+    await this.userAuthRepo.revokeRefreshToken(token.id);
+    const newToken = await this.userAuthRepo.createRefreshToken({
       userId,
       token: signRefreshToken(userId),
       expiredAt: new Date(Date.now() + REFRESH_TTL_MS),
     });
 
-    return {
-      accessToken: signAccessToken(userId),
-      refreshToken: newToken.token,
-    };
+    return { accessToken: signAccessToken(userId), refreshToken: newToken.token };
   }
 
   async logout(userId: bigint) {
-    return this.userRepository.revokeAllUserRefreshTokens(userId);
+    return this.userAuthRepo.revokeAllUserRefreshTokens(userId);
+  }
+
+  async requestPasswordReset(email: string): Promise<ResetPasswordResult> {
+    const user = await this.userAuthRepo.findByEmail(email);
+    if (!user) throw new NotFoundError("User not found");
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    await this.userAuthRepo.createPasswordResetToken({
+      userId: user.id,
+      token: resetToken,
+      expiredAt: new Date(Date.now() + RESET_TTL_MS),
+    });
+
+    return { message: "Password reset token created" };
+  }
+
+  async resetPassword(input: ResetPasswordInput): Promise<ResetPasswordResult> {
+    const token = await this.userAuthRepo.findPasswordResetToken(input.token);
+    if (!token || token.used_at || token.expired_at < new Date()) {
+      throw new UnauthorizedError("Invalid or expired reset token");
+    }
+
+    await this.userAuthRepo.updatePassword(token.user_id, await hashPassword(input.newPassword));
+    await this.userAuthRepo.markPasswordResetUsed(token.id);
+
+    return { message: "Password reset successful" };
   }
 }

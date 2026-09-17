@@ -37,7 +37,7 @@ npx prisma validate
 Alur request mengikuti pola berlapis:
 
 ```
-Controller  →  UserService  →  UserRepository  →  Prisma  →  PostgreSQL
+Controller  →  UserService  →  AuthRepository  →  Prisma  →  PostgreSQL
 ```
 
 - **Controller**: parsing HTTP, validasi input, mengirim response.
@@ -49,11 +49,11 @@ Controller  →  UserService  →  UserRepository  →  Prisma  →  PostgreSQL
 
 ### 2026-09-17 (auth refactor)
 
-- Refactor auth ke pola berlapis: Controller → UserService → UserRepository → Prisma.
+- Refactor auth ke pola berlapis: Controller → UserService → AuthRepository → Prisma.
 - Memisahkan tanggung jawab: controller hanya menangani HTTP; service menjalankan business rules; repository menjadi satu-satunya pintu ke database.
-- Membuat `UserRepository` dengan metode `findByEmail`, `findById`, `createBuyerUser`, `createRefreshToken`, `findRefreshToken`, `revokeRefreshToken`, dan `revokeAllUserRefreshTokens`.
-- Refactor `UserService` (auth service) untuk mengikuti pola `Controller → UserService → UserRepository → Prisma`.
-- `UserRepository` kini menyediakan semua operasi CRUD lengkap: `findAll`, `findById`, `findByUsername`, `findByEmail`, `create`, `update`, `delete`.
+- Membuat `AuthRepository` dengan metode `findByEmail`, `findById`, `createBuyerUser`, `createRefreshToken`, `findRefreshToken`, `revokeRefreshToken`, dan `revokeAllUserRefreshTokens`.
+- Refactor `UserService` (auth service) untuk mengikuti pola `Controller → UserService → AuthRepository → Prisma`.
+- `AuthRepository` kini menyediakan semua operasi CRUD lengkap: `findAll`, `findById`, `findByUsername`, `findByEmail`, `create`, `update`, `delete`.
 - `UserService` memiliki metode `getAll`, `getById`, `register`, `login`, `getProfile`, `refresh`, `logout`.
 
 ### 2026-09-17
