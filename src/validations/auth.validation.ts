@@ -23,3 +23,11 @@ export const resetPasswordSchema = z.object({
   token: z.string().min(1),
   newPassword: z.string().min(8).max(72),
 });
+
+export const verifyEmailRequestSchema = z.object({
+  email: z.string().email().max(255).transform((email) => email.toLowerCase()),
+});
+
+export const verifyEmailConfirmSchema = z.object({
+  token: z.string().min(1),
+});

@@ -20,7 +20,7 @@ export class UserController {
 
   static update = asyncHandler(async (req: Request, res: Response) => {
     const id = BigInt(req.params.id as string);
-    const user = await userService.update(id, req.body);
+    const user = await userService.update(id, req.body, req.userRole);
     sendSuccess(res, user, "Pengguna berhasil diperbarui");
   });
 

@@ -138,16 +138,16 @@ export class AuthService {
 
   async requestPasswordReset(email: string): Promise<ResetPasswordResult> {
     const user = await this.userAuthRepo.findByEmail(email);
-    if (!user) throw new NotFoundError("Pengguna tidak ditemukan");
+    if (user) {
+      const resetToken = crypto.randomBytes(32).toString("hex");
+      await this.userAuthRepo.createPasswordResetToken({
+        userId: user.id,
+        token: resetToken,
+        expiredAt: new Date(Date.now() + RESET_TTL_MS),
+      });
+    }
 
-    const resetToken = crypto.randomBytes(32).toString("hex");
-    await this.userAuthRepo.createPasswordResetToken({
-      userId: user.id,
-      token: resetToken,
-      expiredAt: new Date(Date.now() + RESET_TTL_MS),
-    });
-
-    return { message: "Token reset kata sandi berhasil dibuat" };
+    return { message: "Jika email terdaftar, link reset kata sandi telah dikirim" };
   }
 
   async resetPassword(input: ResetPasswordInput): Promise<ResetPasswordResult> {
@@ -160,5 +160,31 @@ export class AuthService {
     await this.userAuthRepo.markPasswordResetUsed(token.id);
 
     return { message: "Kata sandi berhasil direset" };
+  }
+
+  // Email verification
+  async requestEmailVerification(email: string) {
+    const user = await this.userAuthRepo.findByEmail(email);
+    if (!user) return;
+
+    const verifyToken = crypto.randomBytes(32).toString("hex");
+    await this.userAuthRepo.createEmailVerificationToken({
+      userId: user.id,
+      token: verifyToken,
+      expiredAt: new Date(Date.now() + 60 * 60 * 1000),
+    });
+
+    // TODO: kirim email dengan token
+    return { message: "Link verifikasi telah dikirim ke email" };
+  }
+
+  async confirmEmailVerification(token: string) {
+    const verification = await this.userAuthRepo.findEmailVerificationToken(token);
+    if (!verification || verification.expired_at < new Date()) {
+      throw new UnauthorizedError("Token verifikasi tidak valid atau sudah kadaluarsa");
+    }
+
+    await this.userAuthRepo.setEmailVerified(verification.user.id);
+    return { message: "Email berhasil diverifikasi" };
   }
 }

@@ -45,11 +45,21 @@ export class AuthController {
 
   static requestPasswordReset = asyncHandler(async (req: Request, res: Response) => {
     const result = await authService.requestPasswordReset(req.body.email);
-    sendSuccess(res, result, "Link reset kata sandi berhasil dikirim");
+    sendSuccess(res, result, "Link reset kata sandi dikirim");
   });
 
   static resetPassword = asyncHandler(async (req: Request, res: Response) => {
     const result = await authService.resetPassword(req.body);
     sendSuccess(res, result, "Kata sandi berhasil direset");
+  });
+
+  static requestEmailVerification = asyncHandler(async (req: Request, res: Response) => {
+    const result = await authService.requestEmailVerification(req.body.email);
+    sendSuccess(res, result, "Link verifikasi telah dikirim");
+  });
+
+  static confirmEmailVerification = asyncHandler(async (req: Request, res: Response) => {
+    const result = await authService.confirmEmailVerification(req.body.token);
+    sendSuccess(res, result, "Email berhasil diverifikasi");
   });
 }

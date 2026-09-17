@@ -1,5 +1,5 @@
 import { UserRepository } from "../repositories/user.repository.js";
-import { NotFoundError } from "../utils/app-error.js";
+import { NotFoundError, ForbiddenError } from "../utils/app-error.js";
 
 export class UserService {
   constructor(private readonly userRepo: UserRepository = new UserRepository()) {}
@@ -14,9 +14,20 @@ export class UserService {
     return user;
   }
 
-  async update(id: bigint, data: { email?: string; role_id?: bigint }) {
+  async update(id: bigint, data: { email?: string; role_id?: bigint }, requesterRole?: string) {
     await this.getById(id);
-    return this.userRepo.update(id, data);
+
+    // Only admin can change role
+    const cleanData = { ...data } as { email?: string; role_id?: bigint };
+    if (requesterRole !== "admin" && cleanData.role_id !== undefined) {
+      delete cleanData.role_id;
+    }
+
+    if (cleanData.role_id !== undefined && requesterRole !== "admin") {
+      throw new ForbiddenError("Hanya admin yang dapat mengubah role pengguna");
+    }
+
+    return this.userRepo.update(id, cleanData);
   }
 
   async updateProfile(id: bigint, data: { full_name?: string }) {

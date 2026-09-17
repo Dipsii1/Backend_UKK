@@ -102,4 +102,29 @@ export class UserAuthRepository {
       data: { password },
     });
   }
+
+  // Email verification methods
+  async createEmailVerificationToken(data: { userId: bigint; token: string; expiredAt: Date }) {
+    return prisma.email_verifications.create({
+      data: {
+        user_id: data.userId,
+        token: data.token,
+        expired_at: data.expiredAt,
+      },
+    });
+  }
+
+  async findEmailVerificationToken(token: string) {
+    return prisma.email_verifications.findUnique({
+      where: { token },
+      include: { user: true },
+    });
+  }
+
+  async setEmailVerified(userId: bigint) {
+    return prisma.users.update({
+      where: { id: userId },
+      data: { email_verified: true },
+    });
+  }
 }
