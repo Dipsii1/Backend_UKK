@@ -14,7 +14,7 @@ const envSchema = z.object({
   REFRESH_TOKEN_COOKIE_NAME: z.string().default("refresh_token"),
   COOKIE_SECURE: z.coerce.boolean().default(false),
   COOKIE_SAMESITE: z.enum(["strict", "lax", "none"]).default("lax"),
-  CLIENT_URL: z.string().url().default("http://localhost:3000"),
+  CLIENT_URL: z.string().url().default("http://localhost:3000/api"),
 
   BCRYPT_SALT_ROUNDS: z.coerce.number().default(10),
 

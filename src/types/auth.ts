@@ -5,12 +5,12 @@ export type RegisterInput = {
 };
 
 export type RegisterResult = {
-  accessToken: string;
   user: {
     public_id: string;
     email: string;
     full_name: string;
   };
+  message: string;
 };
 
 export type LoginInput = {

@@ -25,21 +25,18 @@ import type {
 const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const RESET_TTL_MS = 1 * 60 * 60 * 1000;
 
-// hash password
 const hashPassword = (password: string) => bcrypt.hash(password, env.BCRYPT_SALT_ROUNDS);
-// compare password
 const comparePassword = (password: string, hash: string) => bcrypt.compare(password, hash);
 
-const signAccessToken = (userId: bigint) =>
+const signAccessToken = (userId: bigint): string =>
   jwt.sign({ sub: userId.toString() }, env.JWT_SECRET, {
     expiresIn: env.JWT_ACCESS_EXPIRES_IN as jwt.SignOptions["expiresIn"],
   });
 
-const signRefreshToken = (userId: bigint) =>
+const signRefreshToken = (userId: bigint): string =>
   jwt.sign({ sub: userId.toString() }, env.JWT_SECRET, {
     expiresIn: env.JWT_REFRESH_EXPIRES_IN as jwt.SignOptions["expiresIn"],
   });
-
 
 export class AuthService {
   constructor(private readonly userAuthRepo: UserAuthRepository = new UserAuthRepository()) {}
@@ -58,7 +55,7 @@ export class AuthService {
     await this.userAuthRepo.createEmailVerificationToken({
       userId: user.id,
       token: verifyToken,
-      expiredAt: new Date(Date.now() + RESET_TTL_MS),
+      expiredAt: new Date(Date.now() + 60 * 60 * 1000),
     });
 
     try {
@@ -72,8 +69,8 @@ export class AuthService {
     }
 
     return {
-      accessToken: signAccessToken(user.id),
       user: { public_id: user.public_id, email: user.email, full_name: input.fullName },
+      message: "Registrasi berhasil. Silakan cek email untuk verifikasi akun sebelum login.",
     };
   }
 
@@ -162,7 +159,7 @@ export class AuthService {
       await this.userAuthRepo.createPasswordResetToken({
         userId: user.id,
         token: resetToken,
-        expiredAt: new Date(Date.now() + RESET_TTL_MS),
+        expiredAt: new Date(Date.now() + 60 * 60 * 1000),
       });
 
       try {
@@ -172,7 +169,7 @@ export class AuthService {
           html: resetPasswordTemplate(`${env.CLIENT_URL}/reset-password?token=${resetToken}`),
         });
       } catch {
-        // Respons tetap generik untuk mencegah user enumeration.
+        // Error sudah tercatat di mailer, anti user enumeration.
       }
     }
 
@@ -191,7 +188,6 @@ export class AuthService {
     return { message: "Kata sandi berhasil direset" };
   }
 
-  // Email verification
   async requestEmailVerification(email: string) {
     const user = await this.userAuthRepo.findByEmail(email);
     if (user) {
@@ -209,7 +205,7 @@ export class AuthService {
           html: verifyEmailTemplate(`${env.CLIENT_URL}/verify-email?token=${verifyToken}`),
         });
       } catch {
-        // Error sudah ter-log di mailer.ts, tidak mengubah respons.
+        // Error sudah tercatat di mailer.
       }
     }
 
