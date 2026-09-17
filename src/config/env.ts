@@ -17,6 +17,12 @@ const envSchema = z.object({
   CLIENT_URL: z.string().url().default("http://localhost:3000"),
 
   BCRYPT_SALT_ROUNDS: z.coerce.number().default(10),
+
+  SMTP_HOST: z.string().default("smtp.gmail.com"),
+  SMTP_PORT: z.coerce.number().default(587),
+  SMTP_USER: z.string().email(),
+  SMTP_PASS: z.string().min(16),
+  SMTP_FROM: z.string(),
 });
 
 const parsed = envSchema.safeParse(process.env);

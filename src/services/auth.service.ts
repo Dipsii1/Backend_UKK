@@ -3,6 +3,8 @@ import jwt from "jsonwebtoken";
 import crypto from "node:crypto";
 import { env } from "../config/env.js";
 import { UserAuthRepository } from "../repositories/auth.repository.js";
+import { resetPasswordTemplate, verifyEmailTemplate } from "../utils/email-templates.js";
+import { sendMail } from "../utils/mailer.js";
 import {
   NotFoundError,
   ConflictError,
@@ -145,6 +147,16 @@ export class AuthService {
         token: resetToken,
         expiredAt: new Date(Date.now() + RESET_TTL_MS),
       });
+
+      try {
+        await sendMail({
+          to: user.email,
+          subject: "Reset Kata Sandi",
+          html: resetPasswordTemplate(`${env.CLIENT_URL}/reset-password?token=${resetToken}`),
+        });
+      } catch {
+        // Respons tetap generik untuk mencegah user enumeration.
+      }
     }
 
     return { message: "Jika email terdaftar, link reset kata sandi telah dikirim" };
@@ -165,17 +177,26 @@ export class AuthService {
   // Email verification
   async requestEmailVerification(email: string) {
     const user = await this.userAuthRepo.findByEmail(email);
-    if (!user) return;
+    if (user) {
+      const verifyToken = crypto.randomBytes(32).toString("hex");
+      await this.userAuthRepo.createEmailVerificationToken({
+        userId: user.id,
+        token: verifyToken,
+        expiredAt: new Date(Date.now() + 60 * 60 * 1000),
+      });
 
-    const verifyToken = crypto.randomBytes(32).toString("hex");
-    await this.userAuthRepo.createEmailVerificationToken({
-      userId: user.id,
-      token: verifyToken,
-      expiredAt: new Date(Date.now() + 60 * 60 * 1000),
-    });
+      try {
+        await sendMail({
+          to: user.email,
+          subject: "Verifikasi Email",
+          html: verifyEmailTemplate(`${env.CLIENT_URL}/verify-email?token=${verifyToken}`),
+        });
+      } catch {
+        // Error sudah ter-log di mailer.ts, tidak mengubah respons.
+      }
+    }
 
-    // TODO: kirim email dengan token
-    return { message: "Link verifikasi telah dikirim ke email" };
+    return { message: "Jika email terdaftar, link verifikasi telah dikirim" };
   }
 
   async confirmEmailVerification(token: string) {
