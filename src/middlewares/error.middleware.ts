@@ -1,8 +1,16 @@
 import type { Request, Response, NextFunction } from "express";
 import { ZodError, type ZodSchema } from "zod";
 import { env } from "../config/env.js";
-import { AppError, ValidationError, InternalServerError } from "../utils/app-error.js";
+import { AppError, ValidationError, ConflictError, UnauthorizedError, ForbiddenError, NotFoundError } from "../utils/app-error.js";
 import { sendError } from "../utils/api-response.js";
+
+const errorMap: Record<string, AppError> = {
+  EMAIL_EXISTS: new ConflictError("Email sudah terdaftar"),
+  INVALID_CREDENTIALS: new UnauthorizedError("Email Atau Password Salah"),
+  INVALID_TOKEN: new UnauthorizedError("Token tidak valid atau sudah kadaluarsa"),
+  ACCOUNT_SUSPENDED: new ForbiddenError("Akun sudah tidak aktif"),
+  NOT_FOUND: new NotFoundError("Tidak ditemukan"),
+};
 
 export const validate =
   (schema: ZodSchema) =>
@@ -19,14 +27,6 @@ export const validate =
     req.body = result.data;
     next();
   };
-
-const knownErrorMap: Record<string, { code: string; status: number }> = {
-  EMAIL_EXISTS: { code: "EMAIL_EXISTS", status: 409 },
-  INVALID_CREDENTIALS: { code: "INVALID_CREDENTIALS", status: 401 },
-  INVALID_TOKEN: { code: "INVALID_TOKEN", status: 401 },
-  ACCOUNT_SUSPENDED: { code: "ACCOUNT_SUSPENDED", status: 403 },
-  NOT_FOUND: { code: "NOT_FOUND", status: 404 },
-};
 
 export const errorHandler = (
   error: unknown,
@@ -56,16 +56,16 @@ export const errorHandler = (
     return;
   }
 
-  if (error instanceof Error && error.message in knownErrorMap) {
-    const mapped = knownErrorMap[error.message];
-    if (env.NODE_ENV === "development") {
-      console.error(`[${mapped.code}] ${req.method} ${req.path}:`, error.message);
-    }
-    sendError(res, mapped.code, error.message, mapped.status);
-    return;
-  }
-
   if (error instanceof Error) {
+    const mapped = errorMap[error.message];
+    if (mapped) {
+      if (env.NODE_ENV === "development") {
+        console.error(`[${mapped.code}] ${req.method} ${req.path}:`, error.message);
+      }
+      sendError(res, mapped.code, error.message, mapped.statusCode, mapped.errors);
+      return;
+    }
+
     if (env.NODE_ENV === "development") {
       console.error(`[INTERNAL_ERROR] ${req.method} ${req.path}:`, error);
     }

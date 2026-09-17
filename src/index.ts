@@ -5,6 +5,7 @@ import { prisma } from "./config/database.js";
 import { errorHandler } from "./middlewares/error.middleware.js";
 import authRouter from "./routes/auth.route.js";
 import userRouter from "./routes/user.route.js";
+import verifyEmailRouter from "./routes/verify-email.route.js";
 
 const app = express();
 
@@ -14,6 +15,7 @@ app.use(cookieParser());
 
 app.use("/api/auth", authRouter);
 app.use("/api/users", userRouter);
+app.use("/api/verify-email", verifyEmailRouter);
 
 app.use(errorHandler);
 
