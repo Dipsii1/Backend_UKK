@@ -1,86 +1,203 @@
-# UKK 2026 Backend
+<div align="center">
 
-Backend API untuk aplikasi manajemen event dan ticketing UKK 2026.
+# 🎟️ UKK 2026 Backend
 
-## Prasyarat
+**Backend API untuk aplikasi manajemen event dan ticketing UKK 2026**
 
-- Node.js 22+
-- PostgreSQL
+![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?logo=nodedotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+![Prisma](https://img.shields.io/badge/Prisma-2D3748?logo=prisma&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
+![Swagger](https://img.shields.io/badge/Swagger-85EA2D?logo=swagger&logoColor=black)
 
-## Instalasi
+</div>
+
+---
+
+## 📑 Daftar Isi
+
+- [Prasyarat](#-prasyarat)
+- [Instalasi](#-instalasi)
+- [Konfigurasi Environment](#-konfigurasi-environment)
+- [Menjalankan](#-menjalankan)
+- [Database](#-database)
+- [Arsitektur](#-arsitektur)
+- [Dokumentasi API](#-dokumentasi-api)
+- [Endpoint](#-endpoint)
+- [Format Response](#-format-response)
+- [Changelog](#-changelog)
+
+---
+
+## ✅ Prasyarat
+
+- Node.js **22+**
+- PostgreSQL (atau [Neon](https://neon.tech) serverless Postgres)
+
+## 📦 Instalasi
 
 ```bash
 npm install
 ```
 
-Buat `.env` dan isi koneksi PostgreSQL:
+## 🔐 Konfigurasi Environment
+
+Buat file `.env` di root project:
 
 ```env
-DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public"
+# Database
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require"
+
+# JWT
+JWT_SECRET="minimal-32-karakter"
+JWT_ACCESS_EXPIRES_IN=15m
+JWT_REFRESH_EXPIRES_IN=7d
+
+# Server
+NODE_ENV=development
+PORT=3000
+CLIENT_URL=http://localhost:3000/api/v1
+
+# SMTP (verifikasi email & reset kata sandi)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=email@gmail.com
+SMTP_PASS=app-password
+SMTP_FROM="Backend UKK <email@gmail.com>"
 ```
 
-## Database
+| Variabel | Keterangan |
+|----------|------------|
+| `DATABASE_URL` | Connection string PostgreSQL / Neon |
+| `JWT_SECRET` | Secret penandatangan JWT (minimal 32 karakter) |
+| `JWT_ACCESS_EXPIRES_IN` | Masa berlaku access token |
+| `JWT_REFRESH_EXPIRES_IN` | Masa berlaku refresh token |
+| `PORT` | Port server |
+| `CLIENT_URL` | Dipakai untuk link email verifikasi & reset kata sandi |
+| `SMTP_*` | Konfigurasi pengiriman email |
 
-```bash
-npx prisma migrate dev
-npx prisma generate
+## 🚀 Menjalankan
+
+| Perintah | Fungsi |
+|----------|--------|
+| `npm run dev` | Mode development (tsx watch) |
+| `npm run build` | Kompilasi TypeScript ke `dist/` |
+| `npm start` | Jalankan hasil build |
+
+## 🗄️ Database
+
+| Perintah | Fungsi |
+|----------|--------|
+| `npx prisma migrate dev` | Jalankan migrasi |
+| `npx prisma generate` | Generate Prisma Client |
+| `npx prisma validate` | Validasi schema |
+
+> Prisma Client di-generate ke `prisma/generated`.
+
+## 🏗️ Arsitektur
+
+Alur request mengikuti pola berlapis:
+
+```mermaid
+flowchart LR
+    A[Route] --> B[Controller] --> C[Service] --> D[Repository] --> E[Prisma] --> F[(PostgreSQL)]
 ```
 
-Validasi schema:
+| Layer | Tanggung jawab |
+|-------|----------------|
+| **Route** | Definisi endpoint + middleware (auth, role, validasi) |
+| **Controller** | Parsing HTTP, memanggil service, mengirim response |
+| **Service** | Aturan bisnis (hash password, JWT, token, validasi domain) |
+| **Repository** | Interaksi database via Prisma |
+| **Prisma** | ORM yang menghasilkan client di `prisma/generated` |
 
-```bash
-npx prisma validate
+## 📚 Dokumentasi API
+
+Swagger UI tersedia di:
+
+```
+http://localhost:3000/api-docs
 ```
 
-## Arsitektur
+Dokumentasi dipecah per section (Auth, Users) di `src/config/swagger/`.
 
-Alur request mengikuti pola berlapis (bahasa Indonesia):
+> Base path semua endpoint: **`/api/v1`**
 
-```
-Controller  →  Service  →  Repository  →  Prisma  →  PostgreSQL
-```
+## 🔌 Endpoint
 
-- **Controller**: parsing HTTP, validasi input, mengirim response.
-- **Service**: aturan bisnis (hash password, JWT, validasi domain).
-- **Repository**: interaksi database via Prisma, dapat di-mock untuk unit test.
-- **Prisma**: ORM yang menghasilkan client di `src/generated/prisma`.
-
-## Endpoint Auth
+### Auth
 
 | Method | Path | Keterangan |
-|--------|------|------------|
-| POST | /api/auth/register | Registrasi akun baru |
-| POST | /api/auth/login | Login (mengirim refresh_token sebagai cookie) |
-| GET | /api/auth/me | Profil pengguna (butuh token) |
-| POST | /api/auth/refresh-token | Refresh access token |
-| POST | /api/auth/logout | Logout |
-| POST | /api/auth/reset-password/request | Request reset kata sandi (email) |
-| POST | /api/auth/reset-password/confirm | Konfirmasi reset kata sandi |
+|:------:|------|------------|
+| `POST` | `/api/v1/auth/register` | Registrasi akun baru (role `buyer`) |
+| `POST` | `/api/v1/auth/login` | Login (`refresh_token` dikirim sebagai cookie) |
+| `POST` | `/api/v1/auth/refresh-token` | Refresh access token |
+| `POST` | `/api/v1/auth/logout` | Logout (butuh token) |
+| `GET` | `/api/v1/auth/me` | Profil pengguna (butuh token) |
+| `POST` | `/api/v1/auth/reset-password/request` | Request link reset kata sandi (email) |
+| `POST` | `/api/v1/auth/reset-password/confirm` | Konfirmasi reset kata sandi |
+| `GET` | `/api/v1/auth/reset-password` | Halaman HTML form reset kata sandi |
+| `POST` | `/api/v1/auth/verify-email/request` | Request ulang link verifikasi email |
+| `POST` | `/api/v1/auth/verify-email/confirm` | Konfirmasi verifikasi email via API |
+| `GET` | `/api/v1/auth/verify-email` | Halaman HTML verifikasi email |
 
-## Endpoint User (admin)
+### User
 
-| Method | Path | Keterangan |
-|--------|------|------------|
-| GET | /api/users | Daftar semua pengguna |
-| GET | /api/users/:id | Detail pengguna by ID |
-| PUT | /api/users/:id | Update pengguna |
-| DELETE | /api/users/:id | Hapus pengguna |
+| Method | Path | Akses | Keterangan |
+|:------:|------|:-----:|------------|
+| `GET` | `/api/v1/users` | 🔒 admin | Daftar semua pengguna |
+| `GET` | `/api/v1/users/:id` | 👤 pemilik / admin | Detail pengguna by ID |
+| `PUT` | `/api/v1/users/:id` | 👤 pemilik / admin | Update pengguna (role hanya admin) |
+| `DELETE` | `/api/v1/users/:id` | 🔒 admin | Hapus pengguna |
+| `PATCH` | `/api/v1/users/:id/profile` | 👤 pemilik / admin | Update profil (`full_name`) |
 
-## Changelog
+## 📨 Format Response
 
-### 2026-09-17 (auth refactor)
+**Sukses**
 
-- Refactor auth ke pola berlapis: Controller → UserService → AuthRepository → Prisma.
-- Memisahkan tanggung jawab: controller hanya menangani HTTP; service menjalankan business rules; repository menjadi satu-satunya pintu ke database.
-- Membuat `AuthRepository` dengan metode `findByEmail`, `findById`, `createBuyerUser`, `createRefreshToken`, `findRefreshToken`, `revokeRefreshToken`, dan `revokeAllUserRefreshTokens`.
-- Refactor `UserService` (auth service) untuk mengikuti pola `Controller → UserService → AuthRepository → Prisma`.
-- `AuthRepository` kini menyediakan semua operasi CRUD lengkap: `findAll`, `findById`, `findByUsername`, `findByEmail`, `create`, `update`, `delete`.
+```json
+{
+  "success": true,
+  "code": "OK",
+  "status": 200,
+  "message": "Success",
+  "data": {}
+}
+```
+
+**Error**
+
+```json
+{
+  "success": false,
+  "code": "UNAUTHORIZED",
+  "status": 401,
+  "message": "Email Atau Password Salah"
+}
+```
+
+## 📝 Changelog
+
+### 2026-09-17 — Auth refactor
+
+- Refactor auth ke pola berlapis: `Controller → UserService → AuthRepository → Prisma`.
+- Pemisahan tanggung jawab: controller hanya menangani HTTP, service menjalankan business rules, repository menjadi satu-satunya pintu ke database.
+- `AuthRepository` menyediakan operasi lengkap: `findAll`, `findById`, `findByUsername`, `findByEmail`, `create`, `update`, `delete`, serta `createBuyerUser`, `createRefreshToken`, `findRefreshToken`, `revokeRefreshToken`, `revokeAllUserRefreshTokens`.
 - `UserService` memiliki metode `getAll`, `getById`, `register`, `login`, `getProfile`, `refresh`, `logout`.
 
-### 2026-09-17
+### 2026-09-17 — Schema database
 
 - Menambahkan schema Prisma lengkap untuk master data, autentikasi, organizer, event, ticketing, cart, order, pembayaran, ticket check-in, dan sistem pendukung.
 - Menambahkan enum status untuk organizer, event, tiket, order, pembayaran, notifikasi, audit, dan gender.
 - Memperbaiki primary key, foreign key, relasi, indeks, serta field nullable sesuai rancangan database.
 - Menambahkan migrasi awal `20260917030615_init_full_schema`.
-- Menghasilkan Prisma Client ke `src/generated/prisma`.
+- Menghasilkan Prisma Client ke `prisma/generated`.
+
+### API v1 & integrasi Swagger
+
+- Semua endpoint dipindah ke prefix `/api/v1`.
+- Menambahkan Swagger UI (`/api-docs`) dengan dokumentasi lengkap per section (Auth, Users).
+- Menyatukan route email-verification & password-reset ke dalam `auth.route.ts`.
+- Menambahkan `CLIENT_URL` untuk link email verifikasi & reset kata sandi.
+- Menyesuaikan timeout koneksi database (30s) untuk kompatibilitas Neon serverless.
+- Menghapus kontroler terpisah `email-verification` & `password-reset` (digabung ke `AuthController`).

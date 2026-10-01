@@ -1,4 +1,5 @@
 import { prisma } from "../config/database.js";
+import type { Prisma } from "../../prisma/generated/client.js";
 
 export class UserAuthRepository {
   async findByEmail(email: string) {
@@ -21,7 +22,7 @@ export class UserAuthRepository {
     password: string;
     fullName: string;
   }) {
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const role = await tx.roles.upsert({
         where: { name: "buyer" },
         update: {},

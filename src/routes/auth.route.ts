@@ -22,10 +22,12 @@ router.post("/refresh-token", validate(refreshSchema), AuthController.refreshTok
 // Password reset routes
 router.post("/reset-password/request", validate(resetPasswordRequestSchema), AuthController.requestPasswordReset);
 router.post("/reset-password/confirm", validate(resetPasswordSchema), AuthController.resetPassword);
+router.get("/reset-password", AuthController.resetPasswordPage);
 
 // Email verification routes
 router.post("/verify-email/request", validate(verifyEmailRequestSchema), AuthController.requestEmailVerification);
 router.post("/verify-email/confirm", validate(verifyEmailConfirmSchema), AuthController.confirmEmailVerification);
+router.get("/verify-email", AuthController.verifyEmailPage);
 
 // Protected routes
 router.use(requireAuth);

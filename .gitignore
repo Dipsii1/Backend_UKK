@@ -2,6 +2,11 @@ node_modules
 # Keep environment variables out of version control
 .env
 
+# Build output
+dist
+
+# Prisma generated client
+/prisma/generated
 /src/generated/prisma
 
 .agents

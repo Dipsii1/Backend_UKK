@@ -62,7 +62,7 @@ export class AuthService {
       await sendMail({
         to: user.email,
         subject: "Verifikasi Email",
-        html: verifyEmailTemplate(`${env.CLIENT_URL}/verify-email?token=${verifyToken}`),
+        html: verifyEmailTemplate(`${env.CLIENT_URL}/auth/verify-email?token=${verifyToken}`),
       });
     } catch {
       // Error sudah tercatat di mailer; pendaftaran tetap berhasil.
@@ -166,7 +166,7 @@ export class AuthService {
         await sendMail({
           to: user.email,
           subject: "Reset Kata Sandi",
-          html: resetPasswordTemplate(`${env.CLIENT_URL}/reset-password?token=${resetToken}`),
+          html: resetPasswordTemplate(`${env.CLIENT_URL}/auth/reset-password?token=${resetToken}`),
         });
       } catch {
         // Error sudah tercatat di mailer, anti user enumeration.
@@ -202,7 +202,7 @@ export class AuthService {
         await sendMail({
           to: user.email,
           subject: "Verifikasi Email",
-          html: verifyEmailTemplate(`${env.CLIENT_URL}/verify-email?token=${verifyToken}`),
+          html: verifyEmailTemplate(`${env.CLIENT_URL}/auth/verify-email?token=${verifyToken}`),
         });
       } catch {
         // Error sudah tercatat di mailer.
