@@ -4,11 +4,13 @@ import { env } from "./config/env.js";
 import { prisma } from "./config/database.js";
 import { setupSwagger } from "./config/swagger.js";
 import { errorHandler } from "./middlewares/error.middleware.js";
+import { requestLogger } from "./middlewares/logger.middleware.js";
 import authRouter from "./routes/auth.route.js";
 import userRouter from "./routes/user.route.js";
 
 const app = express();
 
+app.use(requestLogger);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
