@@ -92,7 +92,7 @@ SMTP_FROM="Backend UKK <email@gmail.com>"
 | `npx prisma generate` | Generate Prisma Client |
 | `npx prisma validate` | Validasi schema |
 
-> Prisma Client di-generate ke `prisma/generated`.
+> Prisma Client di-generate ke `src/generated/prisma`.
 
 ## 🏗️ Arsitektur
 
@@ -109,7 +109,7 @@ flowchart LR
 | **Controller** | Parsing HTTP, memanggil service, mengirim response |
 | **Service** | Aturan bisnis (hash password, JWT, token, validasi domain) |
 | **Repository** | Interaksi database via Prisma |
-| **Prisma** | ORM yang menghasilkan client di `prisma/generated` |
+| **Prisma** | ORM yang menghasilkan client di `src/generated/prisma` |
 
 ## 📚 Dokumentasi API
 
@@ -178,6 +178,23 @@ Dokumentasi dipecah per section (Auth, Users) di `src/config/swagger/`.
 
 ## 📝 Changelog
 
+### Prisma client output & request logger
+
+- Output Prisma Client dipindah ke `src/generated/prisma`; `src/config/database.ts` dihapus dan digantikan singleton `src/lib/prisma.ts`.
+- Semua modul (`index`, repository, middleware, types) diarahkan ke `src/lib/prisma.ts` agar hanya ada satu instance Prisma Client.
+- Folder lama `prisma/generated` dihapus dan `.gitignore` disesuaikan (`/src/generated/prisma`, `dist`).
+- Menambahkan middleware `requestLogger` yang otomatis mencatat setiap endpoint yang di-hit (method, URL, status, durasi).
+- Menambahkan script database di `package.json`: `db:generate`, `db:validate`, `db:migrate`, `db:deploy`, `db:studio`.
+
+### API v1 & integrasi Swagger
+
+- Semua endpoint dipindah ke prefix `/api/v1`.
+- Menambahkan Swagger UI (`/api-docs`) dengan dokumentasi lengkap per section (Auth, Users).
+- Menyatukan route email-verification & password-reset ke dalam `auth.route.ts`.
+- Menambahkan `CLIENT_URL` untuk link email verifikasi & reset kata sandi.
+- Menyesuaikan timeout koneksi database (30s) untuk kompatibilitas Neon serverless.
+- Menghapus kontroler terpisah `email-verification` & `password-reset` (digabung ke `AuthController`).
+
 ### 2026-09-17 — Auth refactor
 
 - Refactor auth ke pola berlapis: `Controller → UserService → AuthRepository → Prisma`.
@@ -191,13 +208,4 @@ Dokumentasi dipecah per section (Auth, Users) di `src/config/swagger/`.
 - Menambahkan enum status untuk organizer, event, tiket, order, pembayaran, notifikasi, audit, dan gender.
 - Memperbaiki primary key, foreign key, relasi, indeks, serta field nullable sesuai rancangan database.
 - Menambahkan migrasi awal `20260917030615_init_full_schema`.
-- Menghasilkan Prisma Client ke `prisma/generated`.
-
-### API v1 & integrasi Swagger
-
-- Semua endpoint dipindah ke prefix `/api/v1`.
-- Menambahkan Swagger UI (`/api-docs`) dengan dokumentasi lengkap per section (Auth, Users).
-- Menyatukan route email-verification & password-reset ke dalam `auth.route.ts`.
-- Menambahkan `CLIENT_URL` untuk link email verifikasi & reset kata sandi.
-- Menyesuaikan timeout koneksi database (30s) untuk kompatibilitas Neon serverless.
-- Menghapus kontroler terpisah `email-verification` & `password-reset` (digabung ke `AuthController`).
+- Menghasilkan Prisma Client ke `src/generated/prisma`.

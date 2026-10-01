@@ -1,7 +1,7 @@
 import cookieParser from "cookie-parser";
 import express from "express";
 import { env } from "./config/env.js";
-import { prisma } from "./config/database.js";
+import { prisma } from "./lib/prisma.js";
 import { setupSwagger } from "./config/swagger.js";
 import { errorHandler } from "./middlewares/error.middleware.js";
 import { requestLogger } from "./middlewares/logger.middleware.js";

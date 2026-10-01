@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
-import { prisma } from "../config/database.js";
+import { prisma } from "../lib/prisma.js";
 import { ForbiddenError, UnauthorizedError } from "../utils/app-error.js";
 
 declare global {
