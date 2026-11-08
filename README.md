@@ -119,7 +119,7 @@ Swagger UI tersedia di:
 http://localhost:3000/api-docs
 ```
 
-Dokumentasi dipecah per section (Auth, Users) di `src/config/swagger/`.
+Dokumentasi dipecah per section (Auth, Users, Events) di `src/config/swagger/`.
 
 > Base path semua endpoint: **`/api/v1`**
 
@@ -150,6 +150,13 @@ Dokumentasi dipecah per section (Auth, Users) di `src/config/swagger/`.
 | `PUT` | `/api/v1/users/:id` | 👤 pemilik / admin | Update pengguna (role hanya admin) |
 | `DELETE` | `/api/v1/users/:id` | 🔒 admin | Hapus pengguna |
 | `PATCH` | `/api/v1/users/:id/profile` | 👤 pemilik / admin | Update profil (`full_name`) |
+
+### Event
+
+| Method | Path | Akses | Keterangan |
+|:------:|------|:-----:|------------|
+| `GET` | `/api/v1/events` | Publik | Daftar event dengan pagination & filter (lokasi, tanggal, kategori, harga) |
+| `GET` | `/api/v1/events/:id` | Publik | Detail event & daftar jenis tiket aktif |
 
 ## 📨 Format Response
 
@@ -194,6 +201,14 @@ Dokumentasi dipecah per section (Auth, Users) di `src/config/swagger/`.
 - Menambahkan `CLIENT_URL` untuk link email verifikasi & reset kata sandi.
 - Menyesuaikan timeout koneksi database (30s) untuk kompatibilitas Neon serverless.
 - Menghapus kontroler terpisah `email-verification` & `password-reset` (digabung ke `AuthController`).
+
+### 2026-11-08 — Event list & detail endpoints
+
+- Menambahkan modul `event` mengikuti pola berlapis: `Route → Controller → Service → Repository → Prisma`.
+- `GET /api/v1/events`: daftar event dengan pagination (`page`, `limit` maks 100) dan filter opsional (`search`, `location`, `date`, `category`, `min_price`, `max_price`).
+- `GET /api/v1/events/:id`: detail event beserta daftar jenis tiket yang aktif.
+- File baru: `types/event.ts`, `repositories/event.repository.ts`, `services/event.service.ts`, `controllers/event.controller.ts`, `routes/event.route.ts`, `validations/event.validation.ts`, `config/swagger/event.paths.ts`.
+- Route didaftarkan di `src/index.ts` (`/api/v1/events`) dan Swagger tag `Events` ditambahkan di `src/config/swagger.ts`.
 
 ### 2026-09-17 — Auth refactor
 
