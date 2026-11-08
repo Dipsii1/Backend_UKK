@@ -202,14 +202,6 @@ Dokumentasi dipecah per section (Auth, Users, Events) di `src/config/swagger/`.
 - Menyesuaikan timeout koneksi database (30s) untuk kompatibilitas Neon serverless.
 - Menghapus kontroler terpisah `email-verification` & `password-reset` (digabung ke `AuthController`).
 
-### 2026-11-08 — Event list & detail endpoints
-
-- Menambahkan modul `event` mengikuti pola berlapis: `Route → Controller → Service → Repository → Prisma`.
-- `GET /api/v1/events`: daftar event dengan pagination (`page`, `limit` maks 100) dan filter opsional (`search`, `location`, `date`, `category`, `min_price`, `max_price`).
-- `GET /api/v1/events/:id`: detail event beserta daftar jenis tiket yang aktif.
-- File baru: `types/event.ts`, `repositories/event.repository.ts`, `services/event.service.ts`, `controllers/event.controller.ts`, `routes/event.route.ts`, `validations/event.validation.ts`, `config/swagger/event.paths.ts`.
-- Route didaftarkan di `src/index.ts` (`/api/v1/events`) dan Swagger tag `Events` ditambahkan di `src/config/swagger.ts`.
-
 ### 2026-09-17 — Auth refactor
 
 - Refactor auth ke pola berlapis: `Controller → UserService → AuthRepository → Prisma`.
@@ -224,3 +216,11 @@ Dokumentasi dipecah per section (Auth, Users, Events) di `src/config/swagger/`.
 - Memperbaiki primary key, foreign key, relasi, indeks, serta field nullable sesuai rancangan database.
 - Menambahkan migrasi awal `20260917030615_init_full_schema`.
 - Menghasilkan Prisma Client ke `src/generated/prisma`.
+
+### 2026-11-08 — Event list & detail endpoints
+
+- Menambahkan modul `event` mengikuti pola berlapis: `Route → Controller → Service → Repository → Prisma`.
+- `GET /api/v1/events`: daftar event dengan pagination (`page`, `limit` maks 100) dan filter opsional (`search`, `location`, `date`, `category`, `min_price`, `max_price`).
+- `GET /api/v1/events/:id`: detail event beserta daftar jenis tiket yang aktif.
+- File baru: `types/event.ts`, `repositories/event.repository.ts`, `services/event.service.ts`, `controllers/event.controller.ts`, `routes/event.route.ts`, `validations/event.validation.ts`, `config/swagger/event.paths.ts`.
+- Route didaftarkan di `src/index.ts` (`/api/v1/events`) dan Swagger tag `Events` ditambahkan di `src/config/swagger.ts`.
