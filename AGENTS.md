@@ -204,7 +204,7 @@ Belum ada test framework yang ditetapkan. Sampai ditetapkan:
 ### Output Format
 - Conventional commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`.
 - Task summary singkat: apa yang diubah, file terdampak, hasil verifikasi.
-- Update changelog di `README.md` untuk perubahan yang signifikan.
+- **Setelah task selesai, wajib update `README.md`** (changelog + bagian yang terdampak, mis. endpoint, setup, struktur) sebelum dianggap selesai.
 
 ---
 
@@ -215,7 +215,8 @@ Belum ada test framework yang ditetapkan. Sampai ditetapkan:
 3. Implementasi dari layer bawah ke atas: Repository → Service → Controller → Route (+ Swagger), lalu daftarkan di `routes/index.ts`.
 4. Jalankan `npx tsc --noEmit` dan `npx prisma validate`.
 5. Commit dengan conventional commit.
-6. Update `README.md` changelog dan `AGENTS.md` bila ada perubahan arsitektur/behavior.
+6. Setelah implementasi dan verifikasi selesai, **update `README.md`** (changelog + bagian terdampak). Update `AGENTS.md` bila ada perubahan arsitektur/behavior.
 
 ---
+
 > Update tabel ini setiap kali ada perubahan keputusan arsitektur/stack.
