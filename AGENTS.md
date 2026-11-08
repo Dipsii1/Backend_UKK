@@ -58,14 +58,30 @@ Backend_UKK/
 │   └── migrations/            # contoh: 20260917030615_init_full_schema
 └── src/
     ├── generated/prisma/      # Prisma Client (generated — jangan edit)
+    ├── config/                # env, prisma client instance, swagger config
     ├── routes/                # definisi route + Swagger annotation
+    │   ├── index.ts           # mount semua router di bawah /api/v1
+    │   └── <domain>.routes.ts
     ├── controllers/           # HTTP layer
+    │   └── <domain>.controller.ts
     ├── services/              # business rules
+    │   └── <domain>.service.ts
     ├── repositories/          # akses database via Prisma
-    └── ...                    # middleware, utils, config
+    │   └── <domain>.repository.ts
+    ├── middlewares/           # auth (JWT), role guard, validasi, error handler
+    ├── utils/                 # helper (hash, token, response, pagination)
+    ├── types/                 # tipe/DTO bersama
+    └── app.ts / server.ts     # bootstrap Express + listen
 ```
 
-> Struktur `src/` mengikuti layer di atas. Sebelum menambah folder baru, cek struktur yang sudah ada dan ikuti konvensi penamaannya.
+### Konvensi Struktur `src/`
+- **Satu domain = satu file per layer**, penamaan `<domain>.<layer>.ts` (contoh: `user.controller.ts`, `user.service.ts`, `user.repository.ts`, `user.routes.ts`). Ikuti pola auth/user yang sudah ada.
+- Domain mengikuti data model: `user`, `organizer`, `event`, `ticket-type`, `ticket`, `cart`, `order`, `payment`, `check-in`, `notification`, `audit-log`, serta master data (`role`, `gender`).
+- Router baru **wajib** didaftarkan di `routes/index.ts`.
+- Helper lintas domain masuk `utils/`, bukan diduplikasi di service/controller.
+- Middleware (auth, role, validasi, error handler) masuk `middlewares/`, bukan inline di route.
+- Instance Prisma dibuat **sekali** di `config/` dan hanya diimpor oleh repository.
+- Sebelum menambah folder/file baru, cek struktur yang sudah ada dan ikuti penamaannya. Jika nama aktual di repo berbeda dari contoh di atas, **nama aktual yang menang**.
 
 **Aturan dependency:** `routes → controllers → services → repositories → prisma`. Tidak boleh terbalik, tidak boleh melompati layer.
 
@@ -166,7 +182,7 @@ Belum ada test framework yang ditetapkan. Sampai ditetapkan:
 ### Yang BOLEH
 - Edit file di `src/`, `prisma/` (schema + migration baru), dokumentasi.
 - Tambah migration baru via `prisma migrate dev`.
-- Tambah route, controller, service, repository mengikuti layer.
+- Tambah route, controller, service, repository mengikuti layer dan konvensi struktur di Section 3.
 - Update `README.md` (changelog) dan `AGENTS.md` jika behavior berubah.
 
 ### Yang TIDAK BOLEH
@@ -177,6 +193,7 @@ Belum ada test framework yang ditetapkan. Sampai ditetapkan:
 - Memanggil Prisma dari Controller/Service (harus lewat Repository).
 - Menaruh business logic di Controller atau Route.
 - Menambah fitur di luar permintaan.
+- Membuat struktur folder/penamaan file baru yang berbeda dari konvensi di Section 3.
 - `console.log` sisa debug di kode final (gunakan logger yang ada).
 - TODO comment tanpa tiket/issue.
 
@@ -195,17 +212,10 @@ Belum ada test framework yang ditetapkan. Sampai ditetapkan:
 
 1. Baca file terkait (route, controller, service, repository, schema) sebelum mengubah.
 2. Jika perlu perubahan DB: ubah `schema.prisma` → `npx prisma migrate dev --name <nama>` → `npx prisma generate`.
-3. Implementasi dari layer bawah ke atas: Repository → Service → Controller → Route (+ Swagger).
+3. Implementasi dari layer bawah ke atas: Repository → Service → Controller → Route (+ Swagger), lalu daftarkan di `routes/index.ts`.
 4. Jalankan `npx tsc --noEmit` dan `npx prisma validate`.
 5. Commit dengan conventional commit.
 6. Update `README.md` changelog dan `AGENTS.md` bila ada perubahan arsitektur/behavior.
 
 ---
-
-## 12. Change Log
-
-| Tanggal | Perubahan | Oleh |
-|---|---|---|
-| 2026-11-07 | Initial AGENTS.md dari struktur repo & README | AI Agent |
-
 > Update tabel ini setiap kali ada perubahan keputusan arsitektur/stack.
