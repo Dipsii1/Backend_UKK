@@ -25,17 +25,17 @@ import type {
 const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const RESET_TTL_MS = 1 * 60 * 60 * 1000;
 
-const hashPassword = (password: string) => bcrypt.hash(password, env.BCRYPT_SALT_ROUNDS);
+const hashPassword = (password: string) => bcrypt.hash(password, env.BCRYPT_ROUNDS);
 const comparePassword = (password: string, hash: string) => bcrypt.compare(password, hash);
 
 const signAccessToken = (userId: bigint): string =>
   jwt.sign({ sub: userId.toString() }, env.JWT_SECRET, {
-    expiresIn: env.JWT_ACCESS_EXPIRES_IN as jwt.SignOptions["expiresIn"],
+    expiresIn: env.JWT_EXPIRES_IN as jwt.SignOptions["expiresIn"],
   });
 
 const signRefreshToken = (userId: bigint): string =>
   jwt.sign({ sub: userId.toString() }, env.JWT_SECRET, {
-    expiresIn: env.JWT_REFRESH_EXPIRES_IN as jwt.SignOptions["expiresIn"],
+    expiresIn: `${env.REFRESH_TOKEN_TTL_DAYS}d` as jwt.SignOptions["expiresIn"],
   });
 
 export class AuthService {

@@ -100,7 +100,7 @@ describe("HTTP routes", () => {
   });
 
   it("logs in a verified active user and sets an httpOnly refresh cookie", async () => {
-    const password = await bcrypt.hash("Password123!", env.BCRYPT_SALT_ROUNDS);
+    const password = await bcrypt.hash("Password123!", env.BCRYPT_ROUNDS);
     prismaMock.users.findUnique.mockResolvedValueOnce({ ...buyer, password });
     prismaMock.refresh_tokens.create.mockImplementationOnce(async ({ data }: { data: { token: string } }) => ({ token: data.token }));
 
@@ -111,7 +111,7 @@ describe("HTTP routes", () => {
   });
 
   it("rejects inactive and unverified accounts", async () => {
-    const password = await bcrypt.hash("Password123!", env.BCRYPT_SALT_ROUNDS);
+    const password = await bcrypt.hash("Password123!", env.BCRYPT_ROUNDS);
     prismaMock.users.findUnique.mockResolvedValueOnce({ ...buyer, password, is_active: false });
     const inactive = await request(app).post("/api/v1/auth/login").send({ email: buyer.email, password: "Password123!" });
     prismaMock.users.findUnique.mockResolvedValueOnce({ ...buyer, password, email_verified: false });
