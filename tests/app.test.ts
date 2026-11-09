@@ -18,7 +18,7 @@ const prismaMock = vi.hoisted(() => ({
 vi.mock("../src/lib/prisma.js", () => ({ prisma: prismaMock }));
 vi.mock("../src/utils/mailer.js", () => ({ sendMail: vi.fn().mockResolvedValue(undefined) }));
 
-const { app } = await import("../src/app.js");
+const { app } = await import("../src/index.js");
 
 const buyer = {
   id: 1n,
