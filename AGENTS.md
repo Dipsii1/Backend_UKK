@@ -45,13 +45,9 @@ Backend_UKK/
 ├── tsconfig.json
 ├── skills-lock.json
 ├── docs/
-│   ├── _index.md              # titik masuk docs
-│   ├── architecture.md
-│   ├── data-model.md
-│   ├── security.md
-│   ├── testing.md
-│   ├── runbook.md
-│   ├── specs/                 # spec per fitur (_template.md, auth.md)
+│   ├── index.md               # titik masuk docs
+│   ├── security.md            # checklist keamanan (auth, IDOR, transaksi)
+│   ├── specs/                 # spec per fitur & arsitektur (_template.md, auth.md, architecture.md, data_model.md, runbook.md, testing.md)
 │   └── api/conventions.md
 ├── prisma/
 │   ├── schema.prisma
@@ -169,11 +165,13 @@ Jalankan dev server dan build sesuai script di `package.json` (jangan asumsikan 
 
 ## 9. Testing
 
-Belum ada test framework yang ditetapkan. Sampai ditetapkan:
-- Repository didesain **mockable** agar Service bisa di-unit test tanpa database.
+Testing menggunakan **Vitest** + `@vitest/coverage-v8`, **Supertest** untuk endpoint HTTP, dan **vitest-mock-extended** untuk mock Prisma pada unit test.
+- Test berada di `tests/**/*.test.ts` atau `src/**/*.test.ts`; konfigurasi di `vitest.config.ts`.
+- Repository didesain **mockable** agar Service bisa di-unit test tanpa database; `tests/helpers/prisma.mock.ts` mereset Prisma mock tiap test.
 - Setiap perubahan behavior pada Service sebaiknya disertai test (Red → Green → Refactor).
 - Jangan ubah assertion yang sudah ada demi membuat test pass — perbaiki implementasi.
-- Verifikasi minimum sebelum commit: `npx tsc --noEmit` dan `npx prisma validate` lolos.
+- Verifikasi minimum sebelum commit: `npx tsc --noEmit`, `npx prisma validate`, `npm test`, dan `npm run test:coverage` lolos.
+- Target coverage minimum untuk controller dan service adalah 80%.
 
 ---
 

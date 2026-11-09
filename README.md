@@ -25,6 +25,7 @@
 - [Dokumentasi API](#-dokumentasi-api)
 - [Endpoint](#-endpoint)
 - [Format Response](#-format-response)
+- [Testing](#-testing)
 - [Changelog](#-changelog)
 
 ---
@@ -183,7 +184,23 @@ Dokumentasi dipecah per section (Auth, Users, Events) di `src/config/swagger/`.
 }
 ```
 
+## 🧪 Testing
+
+```bash
+npm test
+npm run test:watch
+npm run test:coverage
+```
+
+Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock Prisma; test HTTP memock singleton Prisma sehingga tidak membutuhkan database atau layanan eksternal. Helper `tests/helpers/prisma.mock.ts` tersedia untuk test repository/unit yang membutuhkan Prisma mock dengan reset otomatis.
+
 ## 📝 Changelog
+
+### 2026-11-09 — Automated testing
+
+- Menambahkan konfigurasi Vitest dengan environment Node, coverage V8, serta command `test`, `test:watch`, dan `test:coverage`.
+- Menambahkan test HTTP dengan Supertest dan unit test service dengan repository mock.
+- Menambahkan helper Prisma mock berbasis `vitest-mock-extended` dengan reset otomatis per test.
 
 ### Prisma client output & request logger
 

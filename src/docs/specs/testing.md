@@ -1,7 +1,7 @@
 # Testing
 
 ## Status
-Belum ada test framework yang ditetapkan. Rekomendasi: **Vitest** (TS native) + **supertest** untuk integration.
+Testing memakai **Vitest** + `@vitest/coverage-v8`, **Supertest** untuk endpoint HTTP, dan **vitest-mock-extended** untuk mock Prisma pada unit test.
 
 ## Strategi
 | Level | Target | Cara |
@@ -22,9 +22,21 @@ Belum ada test framework yang ditetapkan. Rekomendasi: **Vitest** (TS native) + 
 - Database test terpisah dari dev/production (jangan pakai Neon production).
 - Prioritas test: auth, otorisasi/ownership, order & pembayaran, check-in.
 
+## Perintah
+```bash
+npm test
+npm run test:watch
+npm run test:coverage
+```
+
+Konfigurasi test berada di `vitest.config.ts`; test berada di `tests/**/*.test.ts` atau `src/**/*.test.ts`. Helper `tests/helpers/prisma.mock.ts` mereset Prisma mock otomatis setiap test.
+
 ## Verifikasi Minimum Sebelum Commit
 ```bash
 npx tsc --noEmit
 npx prisma validate
+npm test
+npm run test:coverage
 ```
-Tambahkan perintah test begitu framework terpasang.
+
+Target coverage minimum untuk controller dan service adalah 80%.
