@@ -27,6 +27,7 @@ const RESET_TTL_MS = 1 * 60 * 60 * 1000;
 
 const hashPassword = (password: string) => bcrypt.hash(password, env.BCRYPT_ROUNDS);
 const comparePassword = (password: string, hash: string) => bcrypt.compare(password, hash);
+const hashToken = (token: string) => crypto.createHash("sha256").update(token).digest("hex");
 
 const signAccessToken = (userId: bigint): string =>
   jwt.sign({ sub: userId.toString() }, env.JWT_SECRET, {
@@ -34,7 +35,7 @@ const signAccessToken = (userId: bigint): string =>
   });
 
 const signRefreshToken = (userId: bigint): string =>
-  jwt.sign({ sub: userId.toString() }, env.JWT_SECRET, {
+  jwt.sign({ sub: userId.toString(), jti: crypto.randomUUID() }, env.JWT_SECRET, {
     expiresIn: `${env.REFRESH_TOKEN_TTL_DAYS}d` as jwt.SignOptions["expiresIn"],
   });
 
@@ -54,7 +55,7 @@ export class AuthService {
     const verifyToken = crypto.randomBytes(32).toString("hex");
     await this.userAuthRepo.createEmailVerificationToken({
       userId: user.id,
-      token: verifyToken,
+      token: hashToken(verifyToken),
       expiredAt: new Date(Date.now() + 60 * 60 * 1000),
     });
 
@@ -76,22 +77,23 @@ export class AuthService {
 
   async login(input: LoginInput): Promise<LoginResult> {
     const user = await this.userAuthRepo.findByEmail(input.email);
-    if (!user || !(await comparePassword(input.password, user.password!))) {
+    if (!user?.password || !(await comparePassword(input.password, user.password))) {
       throw new UnauthorizedError("Email Atau Password Salah");
     }
     if (!user.is_active) throw new ForbiddenError("Akun sudah tidak aktif");
     if (!user.email_verified) throw new ForbiddenError("Email belum diverifikasi");
 
     const profile = user.userProfiles?.[0];
-    const refreshTokenRecord = await this.userAuthRepo.createRefreshToken({
+    const refreshToken = signRefreshToken(user.id);
+    await this.userAuthRepo.createRefreshToken({
       userId: user.id,
-      token: signRefreshToken(user.id),
+      token: hashToken(refreshToken),
       expiredAt: new Date(Date.now() + REFRESH_TTL_MS),
     });
 
     return {
       accessToken: signAccessToken(user.id),
-      refreshToken: refreshTokenRecord.token,
+      refreshToken,
       user: {
         public_id: user.public_id,
         email: user.email,
@@ -130,7 +132,7 @@ export class AuthService {
       throw new UnauthorizedError("Token tidak valid atau sudah kadaluarsa");
     }
 
-    const token = await this.userAuthRepo.findRefreshToken(oldRefreshToken);
+    const token = await this.userAuthRepo.findRefreshToken(hashToken(oldRefreshToken));
     if (!token || token.revoked_at || token.expired_at < new Date()) {
       throw new UnauthorizedError("Token tidak valid atau sudah kadaluarsa");
     }
@@ -138,14 +140,18 @@ export class AuthService {
     const user = await this.userAuthRepo.findById(userId);
     if (!user?.is_active) throw new ForbiddenError("Akun tidak aktif");
 
-    await this.userAuthRepo.revokeRefreshToken(token.id);
-    const newToken = await this.userAuthRepo.createRefreshToken({
+    const revoked = await this.userAuthRepo.revokeRefreshTokenIfActive(token.id);
+    if (revoked.count === 0) {
+      throw new UnauthorizedError("Token tidak valid atau sudah kadaluarsa");
+    }
+    const newRefreshToken = signRefreshToken(userId);
+    await this.userAuthRepo.createRefreshToken({
       userId,
-      token: signRefreshToken(userId),
+      token: hashToken(newRefreshToken),
       expiredAt: new Date(Date.now() + REFRESH_TTL_MS),
     });
 
-    return { accessToken: signAccessToken(userId), refreshToken: newToken.token };
+    return { accessToken: signAccessToken(userId), refreshToken: newRefreshToken };
   }
 
   async logout(userId: bigint) {
@@ -158,7 +164,7 @@ export class AuthService {
       const resetToken = crypto.randomBytes(32).toString("hex");
       await this.userAuthRepo.createPasswordResetToken({
         userId: user.id,
-        token: resetToken,
+        token: hashToken(resetToken),
         expiredAt: new Date(Date.now() + 60 * 60 * 1000),
       });
 
@@ -177,13 +183,19 @@ export class AuthService {
   }
 
   async resetPassword(input: ResetPasswordInput): Promise<ResetPasswordResult> {
-    const token = await this.userAuthRepo.findPasswordResetToken(input.token);
+    const token = await this.userAuthRepo.findPasswordResetToken(hashToken(input.token));
     if (!token || token.used_at || token.expired_at < new Date()) {
       throw new UnauthorizedError("Token reset kata sandi tidak valid atau sudah kadaluarsa");
     }
 
-    await this.userAuthRepo.updatePassword(token.user_id, await hashPassword(input.newPassword));
-    await this.userAuthRepo.markPasswordResetUsed(token.id);
+    const completed = await this.userAuthRepo.completePasswordReset(
+      token.id,
+      token.user_id,
+      await hashPassword(input.newPassword),
+    );
+    if (!completed) {
+      throw new UnauthorizedError("Token reset kata sandi tidak valid atau sudah kadaluarsa");
+    }
 
     return { message: "Kata sandi berhasil direset" };
   }
@@ -194,7 +206,7 @@ export class AuthService {
       const verifyToken = crypto.randomBytes(32).toString("hex");
       await this.userAuthRepo.createEmailVerificationToken({
         userId: user.id,
-        token: verifyToken,
+        token: hashToken(verifyToken),
         expiredAt: new Date(Date.now() + 60 * 60 * 1000),
       });
 
@@ -213,11 +225,15 @@ export class AuthService {
   }
 
   async confirmEmailVerification(token: string) {
-    const verification = await this.userAuthRepo.findEmailVerificationToken(token);
-    if (!verification || verification.expired_at < new Date()) {
+    const verification = await this.userAuthRepo.findEmailVerificationToken(hashToken(token));
+    if (!verification || verification.expired_at < new Date() || verification.verified_at) {
       throw new UnauthorizedError("Token verifikasi tidak valid atau sudah kadaluarsa");
     }
 
+    const consumed = await this.userAuthRepo.consumeEmailVerificationToken(verification.id);
+    if (consumed.count === 0) {
+      throw new UnauthorizedError("Token verifikasi tidak valid atau sudah kadaluarsa");
+    }
     await this.userAuthRepo.setEmailVerified(verification.user.id);
     return { message: "Email berhasil diverifikasi" };
   }

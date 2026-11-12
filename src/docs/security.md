@@ -8,11 +8,14 @@ Gunakan sebelum merge fitur sensitif (auth, order, pembayaran, check-in).
 - [ ] Refresh token tersimpan di DB, bisa di-revoke (single & semua device)
 - [ ] Logout me-revoke refresh token
 - [ ] Rate limit pada login/register/refresh
+- [ ] Token reset password dan verifikasi email disimpan sebagai hash, expired, dan hanya dipakai sekali
+- [ ] Reset password me-revoke seluruh refresh token aktif user
 
 ## B. Otorisasi
 - [ ] Role dicek di middleware Route
 - [ ] Ownership dicek di Service (cegah IDOR): user hanya akses order/tiket sendiri, organizer hanya event sendiri
 - [ ] Endpoint admin/organizer tidak bisa diakses role lain
+- [ ] Endpoint publik hanya mengembalikan event berstatus `published` dan `is_published = true`
 
 ## C. Input & Injection
 - [ ] Input divalidasi di Controller sebelum ke Service

@@ -6,13 +6,13 @@ import { env } from "../src/config/env.js";
 
 const prismaMock = vi.hoisted(() => ({
   $transaction: vi.fn(),
-  events: { findUnique: vi.fn(), findMany: vi.fn(), count: vi.fn() },
+  events: { findFirst: vi.fn(), findMany: vi.fn(), count: vi.fn() },
   roles: { upsert: vi.fn() },
   users: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), findMany: vi.fn(), delete: vi.fn() },
   user_profiles: { create: vi.fn(), update: vi.fn() },
   refresh_tokens: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   password_resets: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
-  email_verifications: { create: vi.fn(), findUnique: vi.fn() },
+  email_verifications: { create: vi.fn(), findUnique: vi.fn(), updateMany: vi.fn() },
 }));
 
 vi.mock("../src/lib/prisma.js", () => ({ prisma: prismaMock }));
@@ -36,7 +36,7 @@ const tokenFor = (id: bigint) => jwt.sign({ sub: id.toString() }, env.JWT_SECRET
 
 const setDefaults = () => {
   prismaMock.$transaction.mockResolvedValue([[], 0]);
-  prismaMock.events.findUnique.mockResolvedValue(null);
+  prismaMock.events.findFirst.mockResolvedValue(null);
   prismaMock.users.findUnique.mockResolvedValue(null);
   prismaMock.users.findMany.mockResolvedValue([]);
 };
@@ -149,12 +149,39 @@ describe("HTTP routes", () => {
     expect([reset.status, verify.status]).toEqual([401, 401]);
   });
 
+  it("refreshes a valid token and confirms email verification", async () => {
+    const refreshToken = tokenFor(1n);
+    prismaMock.refresh_tokens.findUnique.mockResolvedValueOnce({ id: 9n, revoked_at: null, expired_at: new Date(Date.now() + 60_000) });
+    prismaMock.users.findUnique.mockResolvedValueOnce(buyer);
+    prismaMock.refresh_tokens.updateMany.mockResolvedValueOnce({ count: 1 });
+    prismaMock.refresh_tokens.create.mockResolvedValueOnce({});
+    const refreshed = await request(app).post("/api/v1/auth/refresh-token").send({ refreshToken });
+
+    prismaMock.email_verifications.findUnique.mockResolvedValueOnce({ id: 8n, expired_at: new Date(Date.now() + 60_000), verified_at: null, user: buyer });
+    prismaMock.email_verifications.updateMany.mockResolvedValueOnce({ count: 1 });
+    prismaMock.users.update.mockResolvedValueOnce({});
+    const verified = await request(app).post("/api/v1/auth/verify-email/confirm").send({ token: "valid-token" });
+
+    expect([refreshed.status, verified.status]).toEqual([200, 200]);
+  });
+
   it("serves auth HTML pages and generic reset or verification requests", async () => {
     const resetPage = await request(app).get("/api/v1/auth/reset-password?token=reset-token");
     const verifyMissing = await request(app).get("/api/v1/auth/verify-email");
     const resetRequest = await request(app).post("/api/v1/auth/reset-password/request").send({ email: "missing@example.com" });
     const verifyRequest = await request(app).post("/api/v1/auth/verify-email/request").send({ email: "missing@example.com" });
     expect([resetPage.status, verifyMissing.status, resetRequest.status, verifyRequest.status]).toEqual([200, 400, 200, 200]);
+  });
+
+  it("rejects a reset page without a token, escapes its token, and shows verification failure safely", async () => {
+    const missingReset = await request(app).get("/api/v1/auth/reset-password");
+    const resetPage = await request(app).get("/api/v1/auth/reset-password?token=%22%3E%3Cscript%3Ealert(1)%3C%2Fscript%3E");
+    const verificationFailure = await request(app).get("/api/v1/auth/verify-email?token=invalid");
+
+    expect(missingReset.status).toBe(400);
+    expect(resetPage.text).toContain("/api/v1/auth/reset-password/confirm");
+    expect(resetPage.text).not.toContain('value="\"><script>');
+    expect(verificationFailure.status).toBe(400);
   });
 
   it("updates, profiles, reads, and deletes users through authorized routes", async () => {

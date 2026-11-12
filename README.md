@@ -51,13 +51,15 @@ DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require"
 
 # JWT
 JWT_SECRET="minimal-32-karakter"
-JWT_ACCESS_EXPIRES_IN=15m
-JWT_REFRESH_EXPIRES_IN=7d
+JWT_EXPIRES_IN=15m
+REFRESH_TOKEN_TTL_DAYS=7
+BCRYPT_ROUNDS=12
 
 # Server
 NODE_ENV=development
 PORT=3000
-CLIENT_URL=http://localhost:3000/api/v1
+CLIENT_URL=http://localhost:3000
+CORS_ORIGIN=http://localhost:3000
 
 # SMTP (verifikasi email & reset kata sandi)
 SMTP_HOST=smtp.gmail.com
@@ -71,10 +73,12 @@ SMTP_FROM="Backend UKK <email@gmail.com>"
 |----------|------------|
 | `DATABASE_URL` | Connection string PostgreSQL / Neon |
 | `JWT_SECRET` | Secret penandatangan JWT (minimal 32 karakter) |
-| `JWT_ACCESS_EXPIRES_IN` | Masa berlaku access token |
-| `JWT_REFRESH_EXPIRES_IN` | Masa berlaku refresh token |
+| `JWT_EXPIRES_IN` | Masa berlaku access token |
+| `REFRESH_TOKEN_TTL_DAYS` | Masa berlaku refresh token dalam hari |
+| `BCRYPT_ROUNDS` | Cost factor bcrypt (4-15) |
 | `PORT` | Port server |
 | `CLIENT_URL` | Dipakai untuk link email verifikasi & reset kata sandi |
+| `CORS_ORIGIN` | Origin frontend yang diizinkan mengirim cookie |
 | `SMTP_*` | Konfigurasi pengiriman email |
 
 ## 🚀 Menjalankan
@@ -121,6 +125,7 @@ http://localhost:3000/api-docs
 ```
 
 Dokumentasi dipecah per section (Auth, Users, Events) di `src/config/swagger/`.
+Dokumentasi produk, standar engineering, keamanan, testing, serta runbook tersedia di [`src/docs/`](src/docs/index.md).
 
 > Base path semua endpoint: **`/api/v1`**
 
@@ -195,6 +200,14 @@ npm run test:coverage
 Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock Prisma; test HTTP memock singleton Prisma sehingga tidak membutuhkan database atau layanan eksternal. Helper `tests/helpers/prisma.mock.ts` tersedia untuk test repository/unit yang membutuhkan Prisma mock dengan reset otomatis.
 
 ## 📝 Changelog
+
+### 2026-11-12 — Security hardening & company documentation
+
+- Menambahkan dokumentasi standar perusahaan di `docs/`: PRD, engineering standards, arsitektur, kontrak API, keamanan, testing, dan runbook.
+- Menyimpan dan melakukan lookup token reset password serta verifikasi email dalam bentuk hash; token verifikasi dan reset kini single-use secara atomik, dan reset password mencabut refresh token aktif.
+- Memperbaiki form reset password agar memakai base path `/api/v1`, menangani token kosong, dan melakukan HTML escaping terhadap token pada halaman browser.
+- Menambahkan validasi path ID numerik, membatasi detail event publik ke event published, dan memindahkan query principal auth ke repository.
+- Menambahkan CORS, Helmet, body limit, rate limiting auth, serta dependensi dan lockfile yang diperlukan.
 
 ### 2026-11-09 — Automated testing
 

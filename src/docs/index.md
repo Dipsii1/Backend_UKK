@@ -14,6 +14,9 @@ Titik masuk dokumentasi. Baca `AGENTS.md` di root dulu, lalu dokumen di bawah se
 | [specs/auth.md](specs/auth.md) | Spec autentikasi | Saat menyentuh auth |
 | [specs/ticket-flow.md](specs/tickets-flow.md) | Alur browsing → order → bayar → e-ticket → check-in | Saat menyentuh event/order/payment/ticket |
 
+| [specs/prd.md](specs/prd.md) | Tujuan produk, aktor, scope, dan alur bisnis | Saat merencanakan fitur |
+| [engineering-standards.md](engineering-standards.md) | Standar implementasi dan review | Sebelum mengubah kode |
+
 ## Aturan Docs
 - Perubahan behavior/arsitektur → update dokumen terkait di PR yang sama.
 - Fitur baru → buat `specs/<fitur>.md` dari template sebelum implementasi.

@@ -3,8 +3,18 @@ import { UserAuthRepository } from "../repositories/auth.repository.js";
 import { AuthService } from "../services/auth.service.js";
 import { sendSuccess } from "../utils/api-response.js";
 import { asyncHandler } from "../utils/async-handler.js";
+import { ValidationError } from "../utils/app-error.js";
 
 const authService = new AuthService(new UserAuthRepository());
+
+const escapeHtml = (value: string): string =>
+  value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character]!);
 
 const cookieOptions = {
   httpOnly: true,
@@ -32,6 +42,9 @@ export class AuthController {
 
   static refreshToken = asyncHandler(async (req: Request, res: Response) => {
     const token = req.body.refreshToken ?? req.cookies?.refresh_token;
+    if (!token) {
+      throw new ValidationError("Validasi gagal", [{ field: "refreshToken", message: "Refresh token wajib diisi" }]);
+    }
     const result = await authService.refresh(token);
     res.cookie("refresh_token", result.refreshToken, cookieOptions);
     sendSuccess(res, { accessToken: result.accessToken }, "Token berhasil diperbarui");
@@ -55,6 +68,11 @@ export class AuthController {
 
   static resetPasswordPage = (req: Request, res: Response) => {
     const token = req.query.token as string;
+    if (!token) {
+      res.status(400).send("<h1>Token tidak ditemukan</h1>");
+      return;
+    }
+    const safeToken = escapeHtml(token);
     res.send(`
       <!DOCTYPE html>
       <html>
@@ -62,7 +80,7 @@ export class AuthController {
       <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
         <h2>Reset Kata Sandi</h2>
         <form id="resetForm" style="max-width: 400px; margin: 0 auto;">
-          <input type="hidden" name="token" value="${token}" />
+          <input type="hidden" name="token" value="${safeToken}" />
           <div style="margin-bottom: 10px;">
             <input type="password" name="newPassword" placeholder="Kata sandi baru" required minlength="8" 
                    style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px;" />
@@ -75,7 +93,7 @@ export class AuthController {
           document.getElementById('resetForm').onsubmit = async function(e) {
             e.preventDefault();
             const formData = new FormData(e.target);
-            const res = await fetch('/api/auth/reset-password/confirm', {
+            const res = await fetch('/api/v1/auth/reset-password/confirm', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ token: formData.token, newPassword: formData.newPassword.value })

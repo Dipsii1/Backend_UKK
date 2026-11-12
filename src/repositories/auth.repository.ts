@@ -16,6 +16,18 @@ export class UserAuthRepository {
     });
   }
 
+  async findAuthUserById(id: bigint) {
+    return prisma.users.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        is_active: true,
+        email_verified: true,
+        role: { select: { name: true } },
+      },
+    });
+  }
+
   // register (default: buyer)
   async createBuyerUser(data: {
     email: string;
@@ -69,6 +81,13 @@ export class UserAuthRepository {
     });
   }
 
+  async revokeRefreshTokenIfActive(id: bigint) {
+    return prisma.refresh_tokens.updateMany({
+      where: { id, revoked_at: null },
+      data: { revoked_at: new Date() },
+    });
+  }
+
   async revokeAllUserRefreshTokens(userId: bigint) {
     return prisma.refresh_tokens.updateMany({
       where: { user_id: userId, revoked_at: null },
@@ -94,6 +113,23 @@ export class UserAuthRepository {
     return prisma.password_resets.update({
       where: { id },
       data: { used_at: new Date() },
+    });
+  }
+
+  async completePasswordReset(id: bigint, userId: bigint, password: string) {
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const consumed = await tx.password_resets.updateMany({
+        where: { id, used_at: null, expired_at: { gt: new Date() } },
+        data: { used_at: new Date() },
+      });
+      if (consumed.count === 0) return false;
+
+      await tx.users.update({ where: { id: userId }, data: { password } });
+      await tx.refresh_tokens.updateMany({
+        where: { user_id: userId, revoked_at: null },
+        data: { revoked_at: new Date() },
+      });
+      return true;
     });
   }
 
@@ -126,6 +162,13 @@ export class UserAuthRepository {
     return prisma.users.update({
       where: { id: userId },
       data: { email_verified: true },
+    });
+  }
+
+  async consumeEmailVerificationToken(id: bigint) {
+    return prisma.email_verifications.updateMany({
+      where: { id, verified_at: null, expired_at: { gt: new Date() } },
+      data: { verified_at: new Date() },
     });
   }
 }

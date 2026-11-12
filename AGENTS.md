@@ -11,6 +11,7 @@ Backend REST API untuk aplikasi **manajemen event dan ticketing UKK 2026**. Caku
 
 **Base path:** `/api/v1`
 **Dokumentasi API:** Swagger UI di `/api-docs`
+**Dokumentasi operasional:** `src/docs/index.md` (PRD, engineering standards, architecture, API conventions, security, testing, runbook).
 
 ---
 
@@ -160,6 +161,8 @@ Jalankan dev server dan build sesuai script di `package.json` (jangan asumsikan 
 - **Logging**: jangan log PII, token, atau password.
 - **Error handling**: global error handler, fail-closed, jangan bocorkan stack trace ke client di production.
 - **Audit**: aksi sensitif (ubah status order/pembayaran, role, check-in) dicatat ke audit log.
+- **Token one-time**: token reset password dan verifikasi email disimpan sebagai hash, memiliki expiry, dan hanya boleh dikonsumsi sekali secara atomik. Reset password mencabut refresh token aktif pengguna.
+- **Event publik**: endpoint publik hanya boleh mengembalikan event dengan `status = published` dan `is_published = true`.
 
 ---
 

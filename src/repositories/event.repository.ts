@@ -133,8 +133,8 @@ export class EventRepository {
   }
 
   async findById(id: bigint): Promise<EventDetail | null> {
-    const event = await prisma.events.findUnique({
-      where: { id },
+    const event = await prisma.events.findFirst({
+      where: { id, status: "published", is_published: true },
       select: {
         id: true,
         public_id: true,

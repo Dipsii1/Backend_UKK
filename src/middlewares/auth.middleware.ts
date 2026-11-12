@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
-import { prisma } from "../lib/prisma.js";
+import { UserAuthRepository } from "../repositories/auth.repository.js";
 import { ForbiddenError, UnauthorizedError } from "../utils/app-error.js";
 
 declare global {
@@ -24,10 +24,7 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     const payload = jwt.verify(token, env.JWT_SECRET) as { sub: string };
     const userId = BigInt(payload.sub);
 
-    const user = await prisma.users.findUnique({
-      where: { id: userId },
-      include: { role: true },
-    });
+    const user = await new UserAuthRepository().findAuthUserById(userId);
 
     if (!user) {
       next(new UnauthorizedError("Sesi tidak valid"));
