@@ -1,9 +1,9 @@
 import type { Request, Response } from "express";
-import { EventService } from "../services/event.service.js";
-import { sendSuccess } from "../utils/api-response.js";
-import { asyncHandler } from "../utils/async-handler.js";
-import { ValidationError } from "../utils/app-error.js";
-import { eventQuerySchema } from "../validations/event.validation.js";
+import { EventService } from "./event.service.js";
+import { sendSuccess } from "../../utils/api-response.js";
+import { asyncHandler } from "../../utils/async-handler.js";
+import { ValidationError } from "../../utils/app-error.js";
+import { eventQuerySchema } from "./event.validation.js";
 
 const eventService = new EventService();
 

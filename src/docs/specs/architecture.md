@@ -1,7 +1,7 @@
 # Architecture
 
 ## Gambaran
-Backend REST API (Node.js 22+, TypeScript, Prisma, PostgreSQL/Neon) dengan arsitektur berlapis. Base path `/api/v1`, Swagger di `/api-docs`.
+Backend REST API (Node.js 22+, TypeScript, Prisma, PostgreSQL/Neon) dengan arsitektur modular berlapis. Base path `/api/v1`, Swagger di `/api-docs`.
 
 ## Alur Request
 
@@ -15,6 +15,12 @@ Client → Route → Controller → Service → Repository → Prisma → Postgr
 | Controller | Parse request, validasi input, kirim response | Akses Prisma, business rules |
 | Service | Business rules, orkestrasi repository, transaksi | Akses `req`/`res` |
 | Repository | Query Prisma, mapping hasil | Business rules, HTTP |
+
+## Struktur Modul
+
+Setiap domain ditempatkan di `src/modules/<domain>/` dan berisi file route, controller, service, repository, serta validation/type yang spesifik untuk domain tersebut. Infrastruktur lintas domain tetap berada di `src/config`, `src/lib`, `src/middlewares`, dan `src/utils`.
+
+Contoh: `src/modules/auth/auth.route.ts` → `auth.controller.ts` → `auth.service.ts` → `auth.repository.ts`.
 
 ## Aturan Dependency
 - Arah: `routes → controllers → services → repositories → prisma`.
@@ -34,7 +40,7 @@ Operasi yang mengubah lebih dari satu tabel terkait stok/order/pembayaran/check-
 ## Keputusan Arsitektur
 | Keputusan | Alasan |
 |---|---|
-| Layered, bukan modul penuh | Sederhana untuk skala project, mudah di-test |
+| Modular berlapis | Domain terisolasi tanpa mengubah arah dependency dan tetap mudah di-test |
 | Repository sebagai satu-satunya pintu DB | Mudah di-mock, query terpusat |
 | Prisma + Neon PostgreSQL | Type-safe, migrasi terkelola, serverless |
 | Status via enum Prisma | Cegah nilai status tidak valid |

@@ -1,6 +1,6 @@
-import { prisma } from "../lib/prisma.js";
-import type { Prisma } from "../generated/prisma/client.js";
-import type { EventQuery, EventListResult, EventDetail } from "../types/event.js";
+import { prisma } from "../../lib/prisma.js";
+import type { Prisma } from "../../generated/prisma/client.js";
+import type { EventQuery, EventListResult, EventDetail } from "./event.types.js";
 
 const toNumber = (value: unknown): number => {
   if (value === null || value === undefined) return 0;

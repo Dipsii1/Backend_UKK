@@ -28,7 +28,8 @@ Package mgr:  npm (package-lock.json)
 ```
 
 ### Keputusan Arsitektur
-- **Layered architecture** (bukan feature-modular penuh): `Route → Controller → Service → Repository → Prisma → PostgreSQL`.
+- **Modular layered architecture**: setiap domain berada di `src/modules/<domain>/`, dengan alur `Route → Controller → Service → Repository → Prisma → PostgreSQL` di dalam module.
+- Infrastruktur bersama tetap berada di `config/`, `lib/`, `middlewares/`, dan `utils/`; jangan diduplikasi ke module.
 - **Repository = satu-satunya pintu ke database.** Service dan Controller tidak boleh memanggil Prisma langsung.
 - **Prisma Client digenerate ke `src/generated/prisma`** — jangan edit manual, jangan commit hasil edit tangan.
 - **Neon serverless PostgreSQL**: gunakan connection string via `DATABASE_URL`, jangan hardcode.
@@ -56,15 +57,11 @@ Backend_UKK/
 └── src/
     ├── generated/prisma/      # Prisma Client (generated — jangan edit)
     ├── config/                # env, prisma client instance, swagger config
-    ├── routes/                # definisi route + Swagger annotation
-    │   ├── index.ts           # mount semua router di bawah /api/v1
-    │   └── <domain>.routes.ts
-    ├── controllers/           # HTTP layer
-    │   └── <domain>.controller.ts
-    ├── services/              # business rules
-    │   └── <domain>.service.ts
-    ├── repositories/          # akses database via Prisma
-    │   └── <domain>.repository.ts
+    ├── modules/               # domain module (route, controller, service, repository, validation/type)
+    │   ├── auth/
+    │   ├── user/
+    │   ├── event/
+    │   └── organizer/
     ├── middlewares/           # auth (JWT), role guard, validasi, error handler
     ├── utils/                 # helper (hash, token, response, pagination)
     ├── types/                 # tipe/DTO bersama
@@ -72,9 +69,9 @@ Backend_UKK/
 ```
 
 ### Konvensi Struktur `src/`
-- **Satu domain = satu file per layer**, penamaan `<domain>.<layer>.ts` (contoh: `user.controller.ts`, `user.service.ts`, `user.repository.ts`, `user.routes.ts`). Ikuti pola auth/user yang sudah ada.
+- **Satu domain = satu folder module** di `src/modules/<domain>/`, dengan penamaan `<domain>.<layer>.ts` (contoh: `user.controller.ts`, `user.service.ts`, `user.repository.ts`, `user.route.ts`). Ikuti pola auth/user yang sudah ada.
 - Domain mengikuti data model: `user`, `organizer`, `event`, `ticket-type`, `ticket`, `cart`, `order`, `payment`, `check-in`, `notification`, `audit-log`, serta master data (`role`, `gender`).
-- Router baru **wajib** didaftarkan di `routes/index.ts`.
+- Router baru **wajib** didaftarkan di `src/index.ts`.
 - Helper lintas domain masuk `utils/`, bukan diduplikasi di service/controller.
 - Middleware (auth, role, validasi, error handler) masuk `middlewares/`, bukan inline di route.
 - Instance Prisma dibuat **sekali** di `config/` dan hanya diimpor oleh repository.

@@ -1,9 +1,9 @@
 import type { Request, Response } from "express";
-import { UserAuthRepository } from "../repositories/auth.repository.js";
-import { AuthService } from "../services/auth.service.js";
-import { sendSuccess } from "../utils/api-response.js";
-import { asyncHandler } from "../utils/async-handler.js";
-import { ValidationError } from "../utils/app-error.js";
+import { UserAuthRepository } from "./auth.repository.js";
+import { AuthService } from "./auth.service.js";
+import { sendSuccess } from "../../utils/api-response.js";
+import { asyncHandler } from "../../utils/async-handler.js";
+import { ValidationError } from "../../utils/app-error.js";
 
 const authService = new AuthService(new UserAuthRepository());
 

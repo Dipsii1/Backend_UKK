@@ -8,9 +8,10 @@ import { prisma } from "./lib/prisma.js";
 import { setupSwagger } from "./config/swagger.js";
 import { errorHandler } from "./middlewares/error.middleware.js";
 import { requestLogger } from "./middlewares/logger.middleware.js";
-import authRouter from "./routes/auth.route.js";
-import userRouter from "./routes/user.route.js";
-import eventRouter from "./routes/event.route.js";
+import authRouter from "./modules/auth/auth.route.js";
+import userRouter from "./modules/user/user.route.js";
+import eventRouter from "./modules/event/event.route.js";
+import organizerRouter from "./modules/organizer/organizer.route.js";
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.use(cookieParser());
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/events", eventRouter);
+app.use("/api/v1/organizer", organizerRouter);
 
 setupSwagger(app);
 app.use(errorHandler);

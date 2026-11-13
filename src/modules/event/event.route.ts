@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { EventController } from "../controllers/event.controller.js";
-import { requireNumericId } from "../middlewares/security.middleware.js";
+import { EventController } from "./event.controller.js";
+import { requireNumericId } from "../../middlewares/security.middleware.js";
 
 const router = Router();
 

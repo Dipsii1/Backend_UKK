@@ -1,6 +1,6 @@
-import { EventRepository } from "../repositories/event.repository.js";
-import type { EventQuery, EventListResult, EventDetail } from "../types/event.js";
-import { NotFoundError } from "../utils/app-error.js";
+import { EventRepository } from "./event.repository.js";
+import type { EventQuery, EventListResult, EventDetail } from "./event.types.js";
+import { NotFoundError } from "../../utils/app-error.js";
 
 export class EventService {
   constructor(private readonly eventRepo: EventRepository = new EventRepository()) {}

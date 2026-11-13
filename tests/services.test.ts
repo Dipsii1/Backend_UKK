@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import crypto from "node:crypto";
-import { EventService } from "../src/services/event.service.js";
-import { UserService } from "../src/services/user.service.js";
-import { AuthService } from "../src/services/auth.service.js";
+import { EventService } from "../src/modules/event/event.service.js";
+import { UserService } from "../src/modules/user/user.service.js";
+import { AuthService } from "../src/modules/auth/auth.service.js";
 import { NotFoundError, UnauthorizedError } from "../src/utils/app-error.js";
 import { ForbiddenError } from "../src/utils/app-error.js";
+import { OrganizerService } from "../src/modules/organizer/organizer.service.js";
+import { ConflictError } from "../src/utils/app-error.js";
 
 vi.mock("../src/utils/mailer.js", () => ({ sendMail: vi.fn().mockResolvedValue(undefined) }));
 
@@ -28,6 +30,37 @@ describe("EventService", () => {
     const service = new EventService({ findAll: vi.fn().mockRejectedValue(new Error("database unavailable")) } as never);
 
     await expect(service.getEvents({ page: 1, limit: 10 })).rejects.toThrow("database unavailable");
+  });
+});
+
+describe("OrganizerService", () => {
+  it("rejects a ticket quota lower than the number already sold", async () => {
+    const repository = {
+      findByOwnerId: vi.fn().mockResolvedValue({ id: 9n }),
+      findTicketByIdAndOrganizer: vi.fn().mockResolvedValue({ id: 7n, sold: 8, quota: 10 }),
+      updateTicket: vi.fn(),
+    };
+    const service = new OrganizerService(repository as never);
+
+    await expect(service.updateTicket(1n, 7n, { quota: 7 })).rejects.toBeInstanceOf(ConflictError);
+    expect(repository.updateTicket).not.toHaveBeenCalled();
+  });
+
+  it("uses paid orders only when calculating festival sales", async () => {
+    const repository = {
+      findByOwnerId: vi.fn().mockResolvedValue({ id: 9n }),
+      findSalesByEvent: vi.fn().mockResolvedValue({
+        id: 3n,
+        title: "Festival",
+        ticketTypes: [{ id: 4n, public_id: "ticket-1", name: "VIP", price: 100000, quota: 20, sold: 3, orderItems: [{ quantity: 2, subtotal: 200000, order_id: 12n }] }],
+      }),
+    };
+    const service = new OrganizerService(repository as never);
+
+    await expect(service.getSales(1n, 3n)).resolves.toMatchObject({
+      summary: { paid_orders: 1, paid_tickets: 2, revenue: 200000, quota: 20, sold: 3 },
+      ticket_types: [{ available: 17 }],
+    });
   });
 });
 

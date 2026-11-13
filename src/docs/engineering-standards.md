@@ -4,7 +4,7 @@
 
 - Gunakan dependency `route → controller → service → repository → Prisma`; Prisma hanya diakses oleh repository.
 - Controller menangani HTTP dan validasi; service menangani aturan bisnis; repository menangani query.
-- Semua route baru berada di `/api/v1`, didaftarkan pada bootstrap, dan memiliki dokumentasi Swagger.
+- Setiap domain baru berada di `src/modules/<domain>/`; route tetap didaftarkan pada bootstrap di `src/index.ts` dan memiliki dokumentasi Swagger.
 - Gunakan enum Prisma untuk status; perubahan schema selalu melalui migration baru.
 - Jangan mengedit generated client, migration lama, `.env`, atau `node_modules`.
 

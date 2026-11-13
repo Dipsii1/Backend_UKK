@@ -1,5 +1,5 @@
-import { UserRepository } from "../repositories/user.repository.js";
-import { NotFoundError, ForbiddenError } from "../utils/app-error.js";
+import { UserRepository } from "./user.repository.js";
+import { NotFoundError, ForbiddenError } from "../../utils/app-error.js";
 
 export class UserService {
   constructor(private readonly userRepo: UserRepository = new UserRepository()) {}

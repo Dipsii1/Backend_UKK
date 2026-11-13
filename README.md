@@ -101,7 +101,7 @@ SMTP_FROM="Backend UKK <email@gmail.com>"
 
 ## 🏗️ Arsitektur
 
-Alur request mengikuti pola berlapis:
+Setiap domain berada di `src/modules/<domain>/` dan mengikuti pola berlapis:
 
 ```mermaid
 flowchart LR
@@ -115,6 +115,8 @@ flowchart LR
 | **Service** | Aturan bisnis (hash password, JWT, token, validasi domain) |
 | **Repository** | Interaksi database via Prisma |
 | **Prisma** | ORM yang menghasilkan client di `src/generated/prisma` |
+
+Domain saat ini: `auth`, `user`, `event`, dan `organizer`. Konfigurasi, middleware, utilitas, serta Prisma adalah shared infrastructure di luar folder module.
 
 ## 📚 Dokumentasi API
 
@@ -164,6 +166,19 @@ Dokumentasi produk, standar engineering, keamanan, testing, serta runbook tersed
 | `GET` | `/api/v1/events` | Publik | Daftar event dengan pagination & filter (lokasi, tanggal, kategori, harga) |
 | `GET` | `/api/v1/events/:id` | Publik | Detail event & daftar jenis tiket aktif |
 
+### Organizer
+
+Semua endpoint berikut memerlukan JWT dengan role `organizer`; akses data juga dibatasi ke organizer pemilik festival.
+
+| Method | Path | Keterangan |
+|:------:|------|------------|
+| `GET`, `POST` | `/api/v1/organizer/event` | Daftar (pagination) dan buat festival |
+| `GET`, `PATCH`, `DELETE` | `/api/v1/organizer/event/:id` | CRUD festival; festival bertiket terjual tidak dapat dihapus |
+| `GET` | `/api/v1/organizer/event/:id/tickets` | Daftar tiket pada festival |
+| `GET` | `/api/v1/organizer/event/:id/sales` | Monitoring order paid, tiket terjual, pendapatan, dan kuota per tipe tiket |
+| `POST` | `/api/v1/organizer/tickets` | Buat tipe tiket dan kuota |
+| `GET`, `PATCH`, `DELETE` | `/api/v1/organizer/tickets/:id` | CRUD tiket dan manajemen kuota; kuota tidak boleh kurang dari penjualan |
+
 ## 📨 Format Response
 
 **Sukses**
@@ -200,6 +215,17 @@ npm run test:coverage
 Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock Prisma; test HTTP memock singleton Prisma sehingga tidak membutuhkan database atau layanan eksternal. Helper `tests/helpers/prisma.mock.ts` tersedia untuk test repository/unit yang membutuhkan Prisma mock dengan reset otomatis.
 
 ## 📝 Changelog
+
+### 2026-11-13 — Struktur modular per domain
+
+- Memindahkan modul `auth`, `user`, `event`, dan `organizer` ke `src/modules/<domain>/`.
+- Mempertahankan alur dependency Route → Controller → Service → Repository → Prisma di dalam setiap module.
+
+### 2026-11-13 — Organizer festival & ticket management
+
+- Menambahkan CRUD festival milik organizer pada `/api/v1/organizer/event` beserta pemeriksaan kepemilikan pada service.
+- Menambahkan CRUD tiket dan manajemen kuota pada `/api/v1/organizer/tickets`; kuota tidak dapat diturunkan di bawah tiket yang sudah terjual dan entitas yang sudah terjual tidak dapat dihapus.
+- Menambahkan monitoring penjualan per festival pada `GET /api/v1/organizer/event/:id/sales`, termasuk order paid, pendapatan, kuota, dan perincian per tipe tiket.
 
 ### 2026-11-12 — Security hardening & company documentation
 

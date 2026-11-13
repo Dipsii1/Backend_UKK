@@ -1,16 +1,16 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import crypto from "node:crypto";
-import { env } from "../config/env.js";
-import { UserAuthRepository } from "../repositories/auth.repository.js";
-import { resetPasswordTemplate, verifyEmailTemplate } from "../utils/email-templates.js";
-import { sendMail } from "../utils/mailer.js";
+import { env } from "../../config/env.js";
+import { UserAuthRepository } from "./auth.repository.js";
+import { resetPasswordTemplate, verifyEmailTemplate } from "../../utils/email-templates.js";
+import { sendMail } from "../../utils/mailer.js";
 import {
   NotFoundError,
   ConflictError,
   UnauthorizedError,
   ForbiddenError,
-} from "../utils/app-error.js";
+} from "../../utils/app-error.js";
 import type {
   LoginInput,
   LoginResult,
@@ -20,7 +20,7 @@ import type {
   RegisterResult,
   ResetPasswordInput,
   ResetPasswordResult,
-} from "../types/auth.js";
+} from "./auth.types.js";
 
 const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const RESET_TTL_MS = 1 * 60 * 60 * 1000;

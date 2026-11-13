@@ -1,8 +1,8 @@
 import type { Request, Response } from "express";
-import { UserRepository } from "../repositories/user.repository.js";
-import { UserService } from "../services/user.service.js";
-import { sendSuccess } from "../utils/api-response.js";
-import { asyncHandler } from "../utils/async-handler.js";
+import { UserRepository } from "./user.repository.js";
+import { UserService } from "./user.service.js";
+import { sendSuccess } from "../../utils/api-response.js";
+import { asyncHandler } from "../../utils/async-handler.js";
 
 const userService = new UserService(new UserRepository());
 

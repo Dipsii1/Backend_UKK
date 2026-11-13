@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
-import { UserAuthRepository } from "../repositories/auth.repository.js";
+import { UserAuthRepository } from "../modules/auth/auth.repository.js";
 import { ForbiddenError, UnauthorizedError } from "../utils/app-error.js";
 
 declare global {
