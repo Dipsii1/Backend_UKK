@@ -62,7 +62,7 @@ export class AuthService {
     try {
       await sendMail({
         to: user.email,
-        subject: "Verifikasi Email",
+        subject: "Verifikasi Email Tixo",
         html: verifyEmailTemplate(`${env.CLIENT_URL}/auth/verify-email?token=${verifyToken}`),
       });
     } catch {
@@ -213,7 +213,7 @@ export class AuthService {
       try {
         await sendMail({
           to: user.email,
-          subject: "Verifikasi Email",
+          subject: "Verifikasi Email Tixo",
           html: verifyEmailTemplate(`${env.CLIENT_URL}/auth/verify-email?token=${verifyToken}`),
         });
       } catch {

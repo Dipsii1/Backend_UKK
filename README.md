@@ -223,6 +223,7 @@ Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock 
 
 ### 2026-11-13 — Organizer festival & ticket management
 
+- Menyesuaikan email verifikasi pendaftaran dengan branding Tixo dan tombol aktivasi akun.
 - Menambahkan CRUD festival milik organizer pada `/api/v1/organizer/event` beserta pemeriksaan kepemilikan pada service.
 - Menambahkan CRUD tiket dan manajemen kuota pada `/api/v1/organizer/tickets`; kuota tidak dapat diturunkan di bawah tiket yang sudah terjual dan entitas yang sudah terjual tidak dapat dihapus.
 - Menambahkan monitoring penjualan per festival pada `GET /api/v1/organizer/event/:id/sales`, termasuk order paid, pendapatan, kuota, dan perincian per tipe tiket.
