@@ -4,6 +4,7 @@ import { authPaths } from "./swagger/auth.paths.js";
 import { usersPaths } from "./swagger/users.paths.js";
 import { eventPaths } from "./swagger/event.paths.js";
 import { organizerPaths } from "./swagger/organizer.paths.js";
+import { adminPaths } from "./swagger/admin.paths.js";
 
 const swaggerDocument = {
   openapi: "3.0.0",
@@ -14,8 +15,9 @@ const swaggerDocument = {
     { name: "Users", description: "Manajemen pengguna" },
     { name: "Events", description: "Manajemen event" },
     { name: "Organizer", description: "Festival, tiket, kuota, dan monitoring penjualan organizer" },
+    { name: "Admin", description: "Approval event, manajemen pengguna dan organizer, serta monitoring sistem" },
   ],
-  paths: { ...authPaths, ...usersPaths, ...eventPaths, ...organizerPaths },
+  paths: { ...authPaths, ...usersPaths, ...eventPaths, ...organizerPaths, ...adminPaths },
   components: {
     securitySchemes: {
       bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },

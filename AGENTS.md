@@ -61,7 +61,8 @@ Backend_UKK/
     │   ├── auth/
     │   ├── user/
     │   ├── event/
-    │   └── organizer/
+    │   ├── organizer/
+    │   └── admin/                 # approval event, manajemen akun, monitoring sistem
     ├── middlewares/           # auth (JWT), role guard, validasi, error handler
     ├── utils/                 # helper (hash, token, response, pagination)
     ├── types/                 # tipe/DTO bersama
@@ -70,7 +71,7 @@ Backend_UKK/
 
 ### Konvensi Struktur `src/`
 - **Satu domain = satu folder module** di `src/modules/<domain>/`, dengan penamaan `<domain>.<layer>.ts` (contoh: `user.controller.ts`, `user.service.ts`, `user.repository.ts`, `user.route.ts`). Ikuti pola auth/user yang sudah ada.
-- Domain mengikuti data model: `user`, `organizer`, `event`, `ticket-type`, `ticket`, `cart`, `order`, `payment`, `check-in`, `notification`, `audit-log`, serta master data (`role`, `gender`).
+- Domain mengikuti data model: `user`, `organizer`, `event`, `admin`, `ticket-type`, `ticket`, `cart`, `order`, `payment`, `check-in`, `notification`, `audit-log`, serta master data (`role`, `gender`).
 - Router baru **wajib** didaftarkan di `src/index.ts`.
 - Helper lintas domain masuk `utils/`, bukan diduplikasi di service/controller.
 - Middleware (auth, role, validasi, error handler) masuk `middlewares/`, bukan inline di route.
@@ -158,6 +159,7 @@ Jalankan dev server dan build sesuai script di `package.json` (jangan asumsikan 
 - **Logging**: jangan log PII, token, atau password.
 - **Error handling**: global error handler, fail-closed, jangan bocorkan stack trace ke client di production.
 - **Audit**: aksi sensitif (ubah status order/pembayaran, role, check-in) dicatat ke audit log.
+- **Admin**: approval event hanya dapat dilakukan saat status `pending_review`; approval mempublikasikan event dan harus dicatat ke audit log. Perubahan status user/organizer oleh admin juga wajib tercatat.
 - **Token one-time**: token reset password dan verifikasi email disimpan sebagai hash, memiliki expiry, dan hanya boleh dikonsumsi sekali secara atomik. Reset password mencabut refresh token aktif pengguna.
 - **Event publik**: endpoint publik hanya boleh mengembalikan event dengan `status = published` dan `is_published = true`.
 

@@ -116,7 +116,7 @@ flowchart LR
 | **Repository** | Interaksi database via Prisma |
 | **Prisma** | ORM yang menghasilkan client di `src/generated/prisma` |
 
-Domain saat ini: `auth`, `user`, `event`, dan `organizer`. Konfigurasi, middleware, utilitas, serta Prisma adalah shared infrastructure di luar folder module.
+Domain saat ini: `auth`, `user`, `event`, `organizer`, dan `admin`. Konfigurasi, middleware, utilitas, serta Prisma adalah shared infrastructure di luar folder module.
 
 ## 📚 Dokumentasi API
 
@@ -179,6 +179,20 @@ Semua endpoint berikut memerlukan JWT dengan role `organizer`; akses data juga d
 | `POST` | `/api/v1/organizer/tickets` | Buat tipe tiket dan kuota |
 | `GET`, `PATCH`, `DELETE` | `/api/v1/organizer/tickets/:id` | CRUD tiket dan manajemen kuota; kuota tidak boleh kurang dari penjualan |
 
+### Admin
+
+Semua endpoint berikut memerlukan JWT dengan role `admin`. Perubahan status dan approval dicatat pada `audit_logs`.
+
+| Method | Path | Keterangan |
+|:------:|------|------------|
+| `PUT` | `/api/v1/admin/event/:id/approve` | Menyetujui event `pending_review` dan mempublikasikannya |
+| `GET` | `/api/v1/admin/users` | Daftar pengguna dengan pagination serta filter `search`, `role`, dan `is_active` |
+| `PATCH` | `/api/v1/admin/users/:id/status` | Mengaktifkan/menonaktifkan akun melalui body `{ "is_active": boolean }` |
+| `GET` | `/api/v1/admin/organizers` | Daftar organizer dengan pagination dan filter status |
+| `PATCH` | `/api/v1/admin/organizers/:id/status` | Memperbarui status organizer (`pending`, `verified`, `rejected`, `suspended`) |
+| `GET` | `/api/v1/admin/dashboard` | Ringkasan user, organizer, event, pending approval, order paid, pendapatan, dan order terbaru |
+| `GET` | `/api/v1/admin/transaction-logs` | Log order/pembayaran dengan pagination dan filter status/rentang tanggal |
+
 ## 📨 Format Response
 
 **Sukses**
@@ -215,6 +229,14 @@ npm run test:coverage
 Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock Prisma; test HTTP memock singleton Prisma sehingga tidak membutuhkan database atau layanan eksternal. Helper `tests/helpers/prisma.mock.ts` tersedia untuk test repository/unit yang membutuhkan Prisma mock dengan reset otomatis.
 
 ## 📝 Changelog
+
+### 2026-11-14 — Admin approval & system monitoring
+
+- Menambahkan modul `admin` dengan akses khusus role admin di prefix `/api/v1/admin`.
+- Menambahkan approval event `pending_review` yang mempublikasikan event dan menyimpan jejak audit.
+- Menambahkan manajemen status user dan organizer, dashboard monitoring keseluruhan, serta log transaksi order/pembayaran.
+- Menambahkan dokumentasi Swagger untuk seluruh endpoint admin.
+- Menyamakan struktur controller, service, repository, dan tipe query modul admin dengan konvensi modular proyek.
 
 ### 2026-11-13 — Struktur modular per domain
 

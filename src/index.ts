@@ -12,6 +12,7 @@ import authRouter from "./modules/auth/auth.route.js";
 import userRouter from "./modules/user/user.route.js";
 import eventRouter from "./modules/event/event.route.js";
 import organizerRouter from "./modules/organizer/organizer.route.js";
+import adminRouter from "./modules/admin/admin.route.js";
 
 const app = express();
 
@@ -26,6 +27,7 @@ app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/events", eventRouter);
 app.use("/api/v1/organizer", organizerRouter);
+app.use("/api/v1/admin", adminRouter);
 
 setupSwagger(app);
 app.use(errorHandler);

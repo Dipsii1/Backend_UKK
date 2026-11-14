@@ -7,6 +7,7 @@ import { NotFoundError, UnauthorizedError } from "../src/utils/app-error.js";
 import { ForbiddenError } from "../src/utils/app-error.js";
 import { OrganizerService } from "../src/modules/organizer/organizer.service.js";
 import { ConflictError } from "../src/utils/app-error.js";
+import { AdminService } from "../src/modules/admin/admin.service.js";
 
 vi.mock("../src/utils/mailer.js", () => ({ sendMail: vi.fn().mockResolvedValue(undefined) }));
 
@@ -89,6 +90,29 @@ describe("UserService", () => {
     await service.update(1n, { email: "updated@example.com", role_id: 2n }, "buyer");
 
     expect(repository.update).toHaveBeenCalledWith(1n, { email: "updated@example.com" });
+  });
+});
+
+describe("AdminService", () => {
+  it("approves a pending event through the repository", async () => {
+    const event = { id: 5n, status: "published" };
+    const repository = { approveEvent: vi.fn().mockResolvedValue({ event, currentStatus: "pending_review" }) };
+    const service = new AdminService(repository as never);
+
+    await expect(service.approveEvent(5n, 1n)).resolves.toEqual(event);
+    expect(repository.approveEvent).toHaveBeenCalledWith(5n, 1n);
+  });
+
+  it("rejects approval when event is not pending review", async () => {
+    const service = new AdminService({ approveEvent: vi.fn().mockResolvedValue({ event: null, currentStatus: "draft" }) } as never);
+    await expect(service.approveEvent(5n, 1n)).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("prevents an admin from disabling their own account", async () => {
+    const repository = { setUserActive: vi.fn() };
+    const service = new AdminService(repository as never);
+    await expect(service.updateUserStatus(1n, false, 1n)).rejects.toBeInstanceOf(ConflictError);
+    expect(repository.setUserActive).not.toHaveBeenCalled();
   });
 });
 
