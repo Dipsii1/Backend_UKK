@@ -43,6 +43,14 @@ export type ProfileResult = {
   city_id: bigint | null;
 };
 
+export type UpdateProfileInput = {
+  full_name?: string;
+  phone?: string | null;
+  gender?: "male" | "female" | "other" | null;
+  birth_date?: Date | null;
+  address?: string | null;
+};
+
 export type RefreshResult = {
   accessToken: string;
   refreshToken: string;

@@ -11,6 +11,7 @@ import {
   resetPasswordSchema,
   verifyEmailRequestSchema,
   verifyEmailConfirmSchema,
+  updateProfileSchema,
 } from "./auth.validation.js";
 
 const router = Router();
@@ -33,6 +34,7 @@ router.get("/verify-email", AuthController.verifyEmailPage);
 // Protected routes
 router.use(requireAuth);
 router.get("/me", AuthController.profile);
+router.patch("/me", validate(updateProfileSchema), AuthController.updateProfile);
 router.post("/logout", AuthController.logout);
 
 export default router;

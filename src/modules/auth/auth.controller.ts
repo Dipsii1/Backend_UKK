@@ -40,6 +40,11 @@ export class AuthController {
     sendSuccess(res, profile, "Profil berhasil diambil");
   });
 
+  static updateProfile = asyncHandler(async (req: Request, res: Response) => {
+    const profile = await authService.updateProfile(req.userId!, req.body);
+    sendSuccess(res, profile, "Profil berhasil diperbarui");
+  });
+
   static refreshToken = asyncHandler(async (req: Request, res: Response) => {
     const token = req.body.refreshToken ?? req.cookies?.refresh_token;
     if (!token) {
