@@ -18,6 +18,7 @@ import type {
   RefreshResult,
   RegisterInput,
   RegisterResult,
+  UpdateProfileInput,
   ResetPasswordInput,
   ResetPasswordResult,
 } from "./auth.types.js";
@@ -122,6 +123,15 @@ export class AuthService {
       province_id: profile?.province_id ?? null,
       city_id: profile?.city_id ?? null,
     };
+  }
+
+  async updateProfile(userId: bigint, input: UpdateProfileInput): Promise<ProfileResult> {
+    const user = await this.userAuthRepo.findById(userId);
+    if (!user) throw new NotFoundError("Pengguna tidak ditemukan");
+
+    const fallbackName = user.userProfiles?.[0]?.full_name ?? user.email.split("@")[0];
+    await this.userAuthRepo.upsertProfile(userId, input, fallbackName);
+    return this.getProfile(userId);
   }
 
   async refresh(oldRefreshToken: string): Promise<RefreshResult> {

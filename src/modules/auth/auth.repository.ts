@@ -1,5 +1,6 @@
 import { prisma } from "../../lib/prisma.js";
 import type { Prisma } from "../../generated/prisma/client.js";
+import type { UpdateProfileInput } from "./auth.types.js";
 
 export class UserAuthRepository {
   async findByEmail(email: string) {
@@ -13,6 +14,14 @@ export class UserAuthRepository {
     return prisma.users.findUnique({
       where: { id },
       include: { role: true, userProfiles: true },
+    });
+  }
+
+  async upsertProfile(userId: bigint, data: UpdateProfileInput, fallbackName: string) {
+    return prisma.user_profiles.upsert({
+      where: { user_id: userId },
+      update: data,
+      create: { ...data, user_id: userId, full_name: data.full_name ?? fallbackName },
     });
   }
 
