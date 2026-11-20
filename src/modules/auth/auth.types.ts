@@ -16,6 +16,7 @@ export type RegisterResult = {
 export type LoginInput = {
   email: string;
   password: string;
+  role?: "admin" | "organizer" | "buyer";
 };
 
 export type LoginResult = {

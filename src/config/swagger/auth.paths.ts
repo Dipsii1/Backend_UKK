@@ -131,7 +131,8 @@ export const authPaths = {
       description:
         "Mengautentikasi pengguna dengan email dan password. " +
         "Mengembalikan **accessToken** (Bearer, berlaku 15 menit) dan **refreshToken** (disimpan di cookie `refresh_token` HttpOnly, berlaku 7 hari). " +
-        "Login akan gagal jika akun tidak aktif atau email belum diverifikasi.",
+        "Login akan gagal jika akun tidak aktif atau email belum diverifikasi. " +
+        "Kirim `role` (opsional) untuk membatasi login ke role tertentu; bila role akun berbeda, login ditolak (403) tanpa membuat sesi.",
       requestBody: {
         required: true,
         content: {
@@ -142,6 +143,7 @@ export const authPaths = {
               properties: {
                 email: { type: "string", format: "email", example: "budi@example.com" },
                 password: { type: "string", example: "rahasia123" },
+                role: { type: "string", enum: ["admin", "organizer", "buyer"], example: "admin" },
               },
             },
           },

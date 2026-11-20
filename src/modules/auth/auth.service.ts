@@ -81,6 +81,10 @@ export class AuthService {
     if (!user?.password || !(await comparePassword(input.password, user.password))) {
       throw new UnauthorizedError("Email Atau Password Salah");
     }
+    // Ditolak sebelum token/sesi dibuat bila role tidak sesuai.
+    if (input.role && user.role.name !== input.role) {
+      throw new ForbiddenError(`Akun ini tidak memiliki akses ${input.role}`);
+    }
     if (!user.is_active) throw new ForbiddenError("Akun sudah tidak aktif");
     if (!user.email_verified) throw new ForbiddenError("Email belum diverifikasi");
 

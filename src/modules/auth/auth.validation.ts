@@ -9,6 +9,8 @@ export const registerSchema = z.object({
 export const loginSchema = z.object({
   email: z.string().email().max(255).transform((email) => email.toLowerCase()),
   password: z.string().min(1).max(72),
+  // Opsional: batasi login ke role tertentu (mis. halaman login admin).
+  role: z.enum(["admin", "organizer", "buyer"]).optional(),
 });
 
 export const refreshSchema = z.object({

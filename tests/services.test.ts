@@ -202,6 +202,29 @@ describe("AuthService", () => {
     await expect(service.login({ email: baseUser.email, password: "Password123!" })).rejects.toBeInstanceOf(ForbiddenError);
   });
 
+  it("rejects login when the requested role does not match, before creating a session", async () => {
+    const password = await (await import("bcrypt")).default.hash("Password123!", 4);
+    const buyer = {
+      id: 1n,
+      password,
+      is_active: true,
+      email_verified: true,
+      public_id: "user-1",
+      email: "buyer@example.com",
+      role: { name: "buyer" },
+      userProfiles: [],
+    };
+    const repository = { findByEmail: vi.fn().mockResolvedValue(buyer), createRefreshToken: vi.fn() };
+    const service = new AuthService(repository as never);
+
+    await expect(service.login({ email: buyer.email, password: "Password123!", role: "admin" })).rejects.toBeInstanceOf(ForbiddenError);
+    expect(repository.createRefreshToken).not.toHaveBeenCalled();
+
+    const ok = await service.login({ email: buyer.email, password: "Password123!", role: "buyer" });
+    expect(ok.user.role).toBe("buyer");
+    expect(repository.createRefreshToken).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects a verification token that was consumed concurrently", async () => {
     const repository = {
       findEmailVerificationToken: vi.fn().mockResolvedValue({
