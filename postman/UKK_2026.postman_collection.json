@@ -1,0 +1,83 @@
+{
+  "info": {
+    "_postman_id": "9d01f604-5b6c-4ddc-a14f-7f54e09b0f73",
+    "name": "UKK 2026 Backend API",
+    "description": "Collection seluruh endpoint API UKK 2026. Isi accessToken setelah login; gunakan token sesuai role untuk folder Users (admin), Organizer, dan Admin.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000/api/v1" },
+    { "key": "accessToken", "value": "" },
+    { "key": "userId", "value": "1" },
+    { "key": "eventId", "value": "1" },
+    { "key": "ticketId", "value": "1" },
+    { "key": "organizerId", "value": "1" },
+    { "key": "verificationToken", "value": "" },
+    { "key": "resetToken", "value": "" },
+    { "key": "refreshToken", "value": "" }
+  ],
+  "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        { "name": "Register", "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"email\": \"buyer@example.com\",\n  \"password\": \"password123\",\n  \"fullName\": \"Budi Santoso\"\n}" }, "url": "{{baseUrl}}/auth/register" } },
+        { "name": "Login", "event": [{ "listen": "test", "script": { "exec": ["const response = pm.response.json();", "if (response.data?.accessToken) pm.collectionVariables.set('accessToken', response.data.accessToken);"], "type": "text/javascript" } }], "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"password123\"\n}" }, "url": "{{baseUrl}}/auth/login" } },
+        { "name": "Refresh Token", "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}" }, "url": "{{baseUrl}}/auth/refresh-token" } },
+        { "name": "Logout", "request": { "method": "POST", "url": "{{baseUrl}}/auth/logout" } },
+        { "name": "Get My Profile", "request": { "method": "GET", "url": "{{baseUrl}}/auth/me" } },
+        { "name": "Request Password Reset", "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"email\": \"buyer@example.com\"\n}" }, "url": "{{baseUrl}}/auth/reset-password/request" } },
+        { "name": "Confirm Password Reset", "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"token\": \"{{resetToken}}\",\n  \"newPassword\": \"passwordBaru123\"\n}" }, "url": "{{baseUrl}}/auth/reset-password/confirm" } },
+        { "name": "Reset Password Page", "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/auth/reset-password?token={{resetToken}}" } },
+        { "name": "Request Email Verification", "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"email\": \"buyer@example.com\"\n}" }, "url": "{{baseUrl}}/auth/verify-email/request" } },
+        { "name": "Confirm Email Verification", "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"token\": \"{{verificationToken}}\"\n}" }, "url": "{{baseUrl}}/auth/verify-email/confirm" } },
+        { "name": "Verify Email Page", "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/auth/verify-email?token={{verificationToken}}" } }
+      ]
+    },
+    {
+      "name": "Users (Admin / Owner)",
+      "item": [
+        { "name": "List Users (Admin)", "request": { "method": "GET", "url": "{{baseUrl}}/users" } },
+        { "name": "Get User", "request": { "method": "GET", "url": "{{baseUrl}}/users/{{userId}}" } },
+        { "name": "Update User", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"email\": \"updated@example.com\"\n}" }, "url": "{{baseUrl}}/users/{{userId}}" } },
+        { "name": "Update User Profile", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"full_name\": \"Budi Santoso Updated\"\n}" }, "url": "{{baseUrl}}/users/{{userId}}/profile" } },
+        { "name": "Delete User (Admin)", "request": { "method": "DELETE", "url": "{{baseUrl}}/users/{{userId}}" } }
+      ]
+    },
+    {
+      "name": "Public Events",
+      "item": [
+        { "name": "List Published Events", "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/events?page=1&limit=10&search=musik&location=Jakarta&date=2026-12-01&category=musik&min_price=100000&max_price=1000000" } },
+        { "name": "Get Published Event", "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/events/{{eventId}}" } }
+      ]
+    },
+    {
+      "name": "Organizer",
+      "item": [
+        { "name": "List My Events", "request": { "method": "GET", "url": "{{baseUrl}}/organizer/event?page=1&limit=10" } },
+        { "name": "Create Event", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"category_id\": \"1\",\n  \"venue_id\": \"1\",\n  \"title\": \"UKK Music Fest 2026\",\n  \"slug\": \"ukk-music-fest-2026\",\n  \"summary\": \"Festival musik tahunan\",\n  \"start_at\": \"2026-12-01T19:00:00.000Z\",\n  \"end_at\": \"2026-12-01T23:00:00.000Z\"\n}" }, "url": "{{baseUrl}}/organizer/event" } },
+        { "name": "Get My Event", "request": { "method": "GET", "url": "{{baseUrl}}/organizer/event/{{eventId}}" } },
+        { "name": "Update My Event", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"title\": \"UKK Music Fest 2026 Updated\"\n}" }, "url": "{{baseUrl}}/organizer/event/{{eventId}}" } },
+        { "name": "Delete My Event", "request": { "method": "DELETE", "url": "{{baseUrl}}/organizer/event/{{eventId}}" } },
+        { "name": "List Event Tickets", "request": { "method": "GET", "url": "{{baseUrl}}/organizer/event/{{eventId}}/tickets" } },
+        { "name": "Get Event Sales", "request": { "method": "GET", "url": "{{baseUrl}}/organizer/event/{{eventId}}/sales" } },
+        { "name": "Create Ticket Type", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"event_id\": \"{{eventId}}\",\n  \"name\": \"VIP\",\n  \"price\": 500000,\n  \"quota\": 100,\n  \"max_purchase\": 5\n}" }, "url": "{{baseUrl}}/organizer/tickets" } },
+        { "name": "Get Ticket Type", "request": { "method": "GET", "url": "{{baseUrl}}/organizer/tickets/{{ticketId}}" } },
+        { "name": "Update Ticket Type", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"quota\": 150\n}" }, "url": "{{baseUrl}}/organizer/tickets/{{ticketId}}" } },
+        { "name": "Delete Ticket Type", "request": { "method": "DELETE", "url": "{{baseUrl}}/organizer/tickets/{{ticketId}}" } }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        { "name": "Approve Event", "request": { "method": "PUT", "url": "{{baseUrl}}/admin/event/{{eventId}}/approve" } },
+        { "name": "List Managed Users", "request": { "method": "GET", "url": "{{baseUrl}}/admin/users?page=1&limit=10&search=budi&role=buyer&is_active=true" } },
+        { "name": "Update User Status", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"is_active\": true\n}" }, "url": "{{baseUrl}}/admin/users/{{userId}}/status" } },
+        { "name": "List Organizers", "request": { "method": "GET", "url": "{{baseUrl}}/admin/organizers?page=1&limit=10&status=pending" } },
+        { "name": "Update Organizer Status", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"status\": \"verified\"\n}" }, "url": "{{baseUrl}}/admin/organizers/{{organizerId}}/status" } },
+        { "name": "System Dashboard", "request": { "method": "GET", "url": "{{baseUrl}}/admin/dashboard" } },
+        { "name": "Transaction Logs", "request": { "method": "GET", "url": "{{baseUrl}}/admin/transaction-logs?page=1&limit=10&status=paid&start_date=2026-01-01T00:00:00.000Z&end_date=2026-12-31T23:59:59.999Z" } }
+      ]
+    }
+  ]
+}

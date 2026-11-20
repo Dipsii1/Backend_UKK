@@ -128,6 +128,7 @@ http://localhost:3000/api-docs
 
 Dokumentasi dipecah per section (Auth, Users, Events) di `src/config/swagger/`.
 Dokumentasi produk, standar engineering, keamanan, testing, serta runbook tersedia di [`src/docs/`](src/docs/index.md).
+Postman Collection seluruh endpoint tersedia di [`postman/UKK_2026.postman_collection.json`](postman/UKK_2026.postman_collection.json) dan dapat langsung diimpor ke Postman.
 
 > Base path semua endpoint: **`/api/v1`**
 
@@ -237,6 +238,7 @@ Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock 
 - Menambahkan manajemen status user dan organizer, dashboard monitoring keseluruhan, serta log transaksi order/pembayaran.
 - Menambahkan dokumentasi Swagger untuk seluruh endpoint admin.
 - Menyamakan struktur controller, service, repository, dan tipe query modul admin dengan konvensi modular proyek.
+- Menambahkan Postman Collection JSON untuk seluruh endpoint Auth, User, Event, Organizer, dan Admin.
 
 ### 2026-11-13 — Struktur modular per domain
 
