@@ -18,13 +18,15 @@ import type {
   RefreshResult,
   RegisterInput,
   RegisterResult,
+  RegisterOrganizerInput,
+  RegisterOrganizerResult,
   UpdateProfileInput,
   ResetPasswordInput,
   ResetPasswordResult,
 } from "./auth.types.js";
 
 const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const RESET_TTL_MS = 1 * 60 * 60 * 1000;
+const EMAIL_VERIFICATION_TTL_MS = 1 * 60 * 60 * 1000;
 
 const hashPassword = (password: string) => bcrypt.hash(password, env.BCRYPT_ROUNDS);
 const comparePassword = (password: string, hash: string) => bcrypt.compare(password, hash);
@@ -73,6 +75,44 @@ export class AuthService {
     return {
       user: { public_id: user.public_id, email: user.email, full_name: input.fullName },
       message: "Registrasi berhasil. Silakan cek email untuk verifikasi akun sebelum login.",
+    };
+  }
+
+  async registerOrganizer(input: RegisterOrganizerInput): Promise<RegisterOrganizerResult> {
+    const [existingEmail, existingSlug] = await Promise.all([
+      this.userAuthRepo.findByEmail(input.email),
+      this.userAuthRepo.findOrganizerBySlug(input.slug),
+    ]);
+    if (existingEmail) throw new ConflictError("Email sudah terdaftar");
+    if (existingSlug) throw new ConflictError("Slug organizer sudah digunakan");
+
+    const verifyToken = crypto.randomBytes(32).toString("hex");
+    const { user, organizer } = await this.userAuthRepo.createOrganizerUser({
+      ...input,
+      password: await hashPassword(input.password),
+      verificationToken: hashToken(verifyToken),
+      verificationExpiresAt: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS),
+    });
+
+    try {
+      await sendMail({
+        to: user.email,
+        subject: "Verifikasi Email Tixo",
+        html: verifyEmailTemplate(`${env.CLIENT_URL}/auth/verify-email?token=${verifyToken}`),
+      });
+    } catch {
+      // Error sudah tercatat di mailer; pendaftaran tetap berhasil.
+    }
+
+    return {
+      user: { public_id: user.public_id, email: user.email, full_name: input.fullName },
+      organizer: {
+        public_id: organizer.public_id,
+        company_name: organizer.company_name,
+        slug: organizer.slug,
+        status: "pending",
+      },
+      message: "Pendaftaran organizer berhasil. Verifikasi email lalu tunggu persetujuan admin.",
     };
   }
 

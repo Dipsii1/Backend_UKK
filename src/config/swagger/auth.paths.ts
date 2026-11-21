@@ -124,6 +124,40 @@ export const authPaths = {
     },
   },
 
+  "/auth/register-organizer": {
+    post: {
+      tags: ["Auth"],
+      summary: "Daftar akun organizer",
+      description: "Mendaftarkan akun organizer langsung dari website. Akun organizer dibuat dengan status **pending**, wajib verifikasi email, dan memerlukan persetujuan admin sebelum dapat mengelola event.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              required: ["email", "password", "fullName", "companyName", "slug"],
+              properties: {
+                email: { type: "string", format: "email", example: "organizer@example.com" },
+                password: { type: "string", minLength: 8, maxLength: 72, example: "rahasia123" },
+                fullName: { type: "string", minLength: 2, maxLength: 100, example: "Andi Pratama" },
+                companyName: { type: "string", minLength: 2, maxLength: 255, example: "Andi Event Organizer" },
+                slug: { type: "string", pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$", example: "andi-event-organizer" },
+                phone: { type: "string", example: "081234567890" },
+                website: { type: "string", format: "uri", example: "https://contoh.com" },
+                description: { type: "string", maxLength: 2000, example: "Penyelenggara konser dan festival." },
+              },
+            },
+          },
+        },
+      },
+      responses: {
+        "201": { description: "Pendaftaran organizer berhasil dan menunggu persetujuan admin." },
+        "409": errorResponse("CONFLICT", "Email atau slug organizer sudah digunakan", 409),
+        "422": validationErrorResponse,
+      },
+    },
+  },
+
   "/auth/login": {
     post: {
       tags: ["Auth"],

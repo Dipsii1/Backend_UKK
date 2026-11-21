@@ -139,6 +139,7 @@ Postman Collection seluruh endpoint tersedia di [`postman/UKK_2026.postman_colle
 | Method | Path | Keterangan |
 |:------:|------|------------|
 | `POST` | `/api/v1/auth/register` | Registrasi akun baru (role `buyer`) |
+| `POST` | `/api/v1/auth/register-organizer` | Registrasi organizer website (role `organizer`, status awal `pending`) |
 | `POST` | `/api/v1/auth/login` | Login (`refresh_token` dikirim sebagai cookie) |
 | `POST` | `/api/v1/auth/refresh-token` | Refresh access token |
 | `POST` | `/api/v1/auth/logout` | Logout (butuh token) |
@@ -230,6 +231,11 @@ npm run test:coverage
 Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock Prisma; test HTTP memock singleton Prisma sehingga tidak membutuhkan database atau layanan eksternal. Helper `tests/helpers/prisma.mock.ts` tersedia untuk test repository/unit yang membutuhkan Prisma mock dengan reset otomatis.
 
 ## 📝 Changelog
+
+### 2026-11-21 — Pendaftaran organizer
+
+- Menambahkan `POST /api/v1/auth/register-organizer` untuk pendaftaran langsung dari website sebagai role `organizer` dengan status `pending`.
+- Pendaftaran organizer membuat user, profil, organisasi, dan token verifikasi email dalam satu transaksi database; organizer harus verifikasi email dan menunggu persetujuan admin.
 
 ### 2026-11-21 — Build reliability
 

@@ -7,6 +7,7 @@ import {
   loginSchema,
   refreshSchema,
   registerSchema,
+  registerOrganizerSchema,
   resetPasswordRequestSchema,
   resetPasswordSchema,
   verifyEmailRequestSchema,
@@ -18,6 +19,7 @@ const router = Router();
 
 // Public auth routes
 router.post("/register", rateLimit(15 * 60 * 1000, 10), validate(registerSchema), AuthController.register);
+router.post("/register-organizer", rateLimit(15 * 60 * 1000, 5), validate(registerOrganizerSchema), AuthController.registerOrganizer);
 router.post("/login", rateLimit(15 * 60 * 1000, 10), validate(loginSchema), AuthController.login);
 router.post("/refresh-token", rateLimit(15 * 60 * 1000, 30), validate(refreshSchema), AuthController.refreshToken);
 

@@ -29,6 +29,11 @@ export class AuthController {
     sendSuccess(res, result, "Pendaftaran berhasil", 201);
   });
 
+  static registerOrganizer = asyncHandler(async (req: Request, res: Response) => {
+    const result = await authService.registerOrganizer(req.body);
+    sendSuccess(res, result, "Pendaftaran organizer berhasil", 201);
+  });
+
   static login = asyncHandler(async (req: Request, res: Response) => {
     const result = await authService.login(req.body);
     res.cookie("refresh_token", result.refreshToken, cookieOptions);

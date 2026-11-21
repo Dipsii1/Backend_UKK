@@ -4,6 +4,14 @@ export type RegisterInput = {
   fullName: string;
 };
 
+export type RegisterOrganizerInput = RegisterInput & {
+  companyName: string;
+  slug: string;
+  phone?: string;
+  website?: string;
+  description?: string;
+};
+
 export type RegisterResult = {
   user: {
     public_id: string;
@@ -11,6 +19,15 @@ export type RegisterResult = {
     full_name: string;
   };
   message: string;
+};
+
+export type RegisterOrganizerResult = RegisterResult & {
+  organizer: {
+    public_id: string;
+    company_name: string;
+    slug: string;
+    status: "pending";
+  };
 };
 
 export type LoginInput = {

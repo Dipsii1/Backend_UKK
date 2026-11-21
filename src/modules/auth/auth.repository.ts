@@ -17,6 +17,10 @@ export class UserAuthRepository {
     });
   }
 
+  async findOrganizerBySlug(slug: string) {
+    return prisma.organizers.findUnique({ where: { slug } });
+  }
+
   async upsertProfile(userId: bigint, data: UpdateProfileInput, fallbackName: string) {
     return prisma.user_profiles.upsert({
       where: { user_id: userId },
@@ -66,6 +70,52 @@ export class UserAuthRepository {
       });
 
       return user;
+    });
+  }
+
+  async createOrganizerUser(data: {
+    email: string;
+    password: string;
+    fullName: string;
+    companyName: string;
+    slug: string;
+    phone?: string;
+    website?: string;
+    description?: string;
+    verificationToken: string;
+    verificationExpiresAt: Date;
+  }) {
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const role = await tx.roles.upsert({
+        where: { name: "organizer" },
+        update: {},
+        create: { name: "organizer" },
+      });
+
+      const user = await tx.users.create({
+        data: { email: data.email, password: data.password, role_id: role.id },
+      });
+
+      await tx.user_profiles.create({
+        data: { user_id: user.id, full_name: data.fullName, phone: data.phone },
+      });
+
+      const organizer = await tx.organizers.create({
+        data: {
+          user_id: user.id,
+          company_name: data.companyName,
+          slug: data.slug,
+          phone: data.phone,
+          website: data.website,
+          description: data.description,
+        },
+      });
+
+      await tx.email_verifications.create({
+        data: { user_id: user.id, token: data.verificationToken, expired_at: data.verificationExpiresAt },
+      });
+
+      return { user, organizer };
     });
   }
 

@@ -95,8 +95,8 @@ Backend_UKK/
 ```
 Controller → UserService → UserRepository → Prisma → PostgreSQL
 ```
-- `UserRepository`: `findAll`, `findById`, `findByUsername`, `findByEmail`, `create`, `update`, `delete`, `createBuyerUser`, `createRefreshToken`, `findRefreshToken`, `revokeRefreshToken`, `revokeAllUserRefreshTokens`.
-- `UserService`: `getAll`, `getById`, `register`, `login`, `getProfile`, `refresh`, `logout`.
+- `UserRepository`: `findAll`, `findById`, `findByUsername`, `findByEmail`, `create`, `update`, `delete`, `createBuyerUser`, `createOrganizerUser`, `createRefreshToken`, `findRefreshToken`, `revokeRefreshToken`, `revokeAllUserRefreshTokens`.
+- `UserService`: `getAll`, `getById`, `register`, `registerOrganizer`, `login`, `getProfile`, `refresh`, `logout`.
 - Fitur baru wajib mengikuti pola yang sama.
 
 ---

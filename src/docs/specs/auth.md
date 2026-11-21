@@ -12,6 +12,7 @@ Controller → UserService → UserRepository → Prisma
 | Method | Path | Auth | Deskripsi |
 |---|---|---|---|
 | POST | /auth/register | - | Daftar user buyer |
+| POST | /auth/register-organizer | - | Daftar organizer website, status awal `pending` |
 | POST | /auth/login | - | Login, kembalikan access + refresh token |
 | GET | /auth/profile | Bearer | Profil user login |
 | POST | /auth/refresh | refresh token | Tukar refresh token dengan access token baru |
@@ -20,7 +21,7 @@ Controller → UserService → UserRepository → Prisma
 ## Aturan Bisnis
 - Email dan username unik; duplikat → 409.
 - Password di-hash sebelum disimpan.
-- Register membuat user dengan role buyer (`createBuyerUser`).
+- Register buyer membuat user dengan role buyer (`createBuyerUser`). Register organizer membuat user role organizer, profil, dan organisasi berstatus `pending` secara atomik (`createOrganizerUser`); organizer harus verifikasi email dan disetujui admin sebelum mengelola event.
 - Refresh token disimpan di DB; logout me-revoke token tersebut; `revokeAllUserRefreshTokens` untuk logout semua device.
 - Refresh token yang di-revoke/kedaluwarsa → 401.
 

@@ -6,6 +6,17 @@ export const registerSchema = z.object({
   fullName: z.string().trim().min(2).max(100),
 });
 
+export const registerOrganizerSchema = z.object({
+  email: z.string().email().max(255).transform((email) => email.toLowerCase()),
+  password: z.string().min(8).max(72),
+  fullName: z.string().trim().min(2).max(100),
+  companyName: z.string().trim().min(2).max(255),
+  slug: z.string().trim().min(3).max(100).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug hanya boleh huruf kecil, angka, dan tanda hubung").transform((slug) => slug.toLowerCase()),
+  phone: z.string().trim().regex(/^(\+62|62|0)8[0-9]{7,12}$/, "Nomor telepon tidak valid").optional(),
+  website: z.string().url().max(255).optional(),
+  description: z.string().trim().min(1).max(2000).optional(),
+}).strict();
+
 export const loginSchema = z.object({
   email: z.string().email().max(255).transform((email) => email.toLowerCase()),
   password: z.string().min(1).max(72),

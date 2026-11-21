@@ -8,6 +8,7 @@ const prismaMock = vi.hoisted(() => ({
   $transaction: vi.fn(),
   events: { findFirst: vi.fn(), findMany: vi.fn(), count: vi.fn() },
   roles: { upsert: vi.fn() },
+  organizers: { findUnique: vi.fn(), create: vi.fn() },
   users: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), findMany: vi.fn(), delete: vi.fn() },
   user_profiles: { create: vi.fn(), update: vi.fn() },
   refresh_tokens: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
@@ -39,6 +40,7 @@ const setDefaults = () => {
   prismaMock.events.findFirst.mockResolvedValue(null);
   prismaMock.users.findUnique.mockResolvedValue(null);
   prismaMock.users.findMany.mockResolvedValue([]);
+  prismaMock.organizers.findUnique.mockResolvedValue(null);
 };
 
 describe("HTTP routes", () => {
@@ -87,6 +89,34 @@ describe("HTTP routes", () => {
 
     expect(response.status).toBe(201);
     expect(response.body.data.user).toEqual({ public_id: "user-3", email: "new@example.com", full_name: "New Buyer" });
+    expect(JSON.stringify(response.body)).not.toContain("Password123!");
+  });
+
+  it("registers an organizer as pending and returns no password", async () => {
+    const createdUser = { id: 4n, public_id: "user-4", email: "organizer@example.com" };
+    const createdOrganizer = { id: 1n, public_id: "organizer-1", company_name: "Tixo Event", slug: "tixo-event", status: "pending" };
+    prismaMock.$transaction.mockImplementationOnce(async (callback: (tx: typeof prismaMock) => unknown) => callback(prismaMock));
+    prismaMock.roles.upsert.mockResolvedValue({ id: 2n });
+    prismaMock.users.create.mockResolvedValue(createdUser);
+    prismaMock.user_profiles.create.mockResolvedValue({});
+    prismaMock.organizers.create.mockResolvedValue(createdOrganizer);
+    prismaMock.email_verifications.create.mockResolvedValue({});
+
+    const response = await request(app).post("/api/v1/auth/register-organizer").send({
+      email: "organizer@example.com",
+      password: "Password123!",
+      fullName: "Organizer One",
+      companyName: "Tixo Event",
+      slug: "tixo-event",
+      phone: "081234567890",
+    });
+
+    expect(response.status).toBe(201);
+    expect(response.body.data).toMatchObject({
+      user: { public_id: "user-4", email: "organizer@example.com", full_name: "Organizer One" },
+      organizer: { public_id: "organizer-1", company_name: "Tixo Event", slug: "tixo-event", status: "pending" },
+    });
+    expect(prismaMock.roles.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { name: "organizer" } }));
     expect(JSON.stringify(response.body)).not.toContain("Password123!");
   });
 
