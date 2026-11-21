@@ -231,6 +231,10 @@ Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock 
 
 ## 📝 Changelog
 
+### 2026-11-21 — Build reliability
+
+- Memperbaiki script `npm run build` agar menggunakan konfigurasi TypeScript yang tersedia (`tsconfig.json`), sehingga build produksi menghasilkan output `dist/`.
+
 ### 2026-11-14 — Admin approval & system monitoring
 
 - Menambahkan modul `admin` dengan akses khusus role admin di prefix `/api/v1/admin`.
