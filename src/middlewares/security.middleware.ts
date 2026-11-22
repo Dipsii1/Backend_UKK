@@ -15,6 +15,11 @@ export const rateLimit = (windowMs: number, max: number) => {
   const buckets = new Map<string, Bucket>();
   return (req: Request, _res: Response, next: NextFunction): void => {
     const now = Date.now();
+    if (buckets.size >= 10_000) {
+      for (const [bucketKey, value] of buckets) {
+        if (value.resetAt <= now) buckets.delete(bucketKey);
+      }
+    }
     const key = `${req.ip}:${req.path}`;
     const bucket = buckets.get(key);
     if (!bucket || bucket.resetAt <= now) {

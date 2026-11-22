@@ -13,19 +13,27 @@ declare global {
   }
 }
 
-export const requireAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const authenticate = async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
   const token = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1];
   if (!token) {
     next(new UnauthorizedError("Autentikasi diperlukan"));
     return;
   }
 
+  let userId: bigint;
   try {
-    const payload = jwt.verify(token, env.JWT_SECRET) as { sub: string };
-    const userId = BigInt(payload.sub);
+    const payload = jwt.verify(token, env.JWT_SECRET, { algorithms: ["HS256"] });
+    if (typeof payload !== "object" || payload === null || typeof payload.sub !== "string" || !/^[1-9]\d*$/.test(payload.sub)) {
+      throw new Error("Invalid JWT subject");
+    }
+    userId = BigInt(payload.sub);
+  } catch {
+    next(new UnauthorizedError("Token tidak valid atau sudah kadaluarsa"));
+    return;
+  }
 
+  try {
     const user = await new UserAuthRepository().findAuthUserById(userId);
-
     if (!user) {
       next(new UnauthorizedError("Sesi tidak valid"));
       return;
@@ -44,12 +52,12 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     req.userId = userId;
     req.userRole = user.role.name;
     next();
-  } catch {
-    next(new UnauthorizedError("Token tidak valid atau sudah kadaluarsa"));
+  } catch (error) {
+    next(error);
   }
 };
 
-export const requireRole = (...roles: string[]) =>
+export const authorize = (...roles: string[]) =>
   (req: Request, _res: Response, next: NextFunction): void => {
     if (!req.userId) {
       next(new UnauthorizedError("Autentikasi diperlukan"));
@@ -64,7 +72,7 @@ export const requireRole = (...roles: string[]) =>
     next();
   };
 
-export const requireSelfOrRole = (...roles: string[]) =>
+export const authorizeSelfOrRole = (...roles: string[]) =>
   (req: Request, _res: Response, next: NextFunction): void => {
     const targetUserId = BigInt(req.params.id as string);
     if (req.userId === targetUserId) {

@@ -8,6 +8,7 @@ import { prisma } from "./lib/prisma.js";
 import { setupSwagger } from "./config/swagger.js";
 import { errorHandler } from "./middlewares/error.middleware.js";
 import { requestLogger } from "./middlewares/logger.middleware.js";
+import { rateLimit } from "./middlewares/security.middleware.js";
 import authRouter from "./modules/auth/auth.route.js";
 import userRouter from "./modules/user/user.route.js";
 import eventRouter from "./modules/event/event.route.js";
@@ -18,10 +19,12 @@ const app = express();
 
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
+app.disable("x-powered-by");
 app.use(requestLogger);
 app.use(express.json({ limit: "100kb" }));
 app.use(express.urlencoded({ extended: true, limit: "100kb" }));
 app.use(cookieParser());
+app.use("/api", rateLimit(15 * 60 * 1000, 300));
 
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/users", userRouter);

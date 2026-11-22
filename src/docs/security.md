@@ -2,6 +2,21 @@
 
 Gunakan sebelum merge fitur sensitif (auth, order, pembayaran, check-in).
 
+## OWASP Top 10 (2021)
+
+| Risiko | Kontrol yang wajib diterapkan di API ini |
+|---|---|
+| A01 Broken Access Control | Gunakan `authenticate` lalu `authorize`/`authorizeSelfOrRole` di route; Service wajib memeriksa ownership. |
+| A02 Cryptographic Failures | Password memakai bcrypt; JWT secret dan kredensial hanya dari environment; token reset/verifikasi disimpan sebagai hash. HTTPS/TLS wajib di terminasi oleh deployment. |
+| A03 Injection | Validasi seluruh input dengan Zod dan gunakan Prisma parameterized query; dilarang memakai `$queryRawUnsafe` dengan input pengguna. |
+| A04 Insecure Design | Dokumentasikan aturan bisnis, gunakan transaksi atomik untuk stok/order/pembayaran, dan tambahkan test atas aturan keamanan. |
+| A05 Security Misconfiguration | Helmet, CORS allowlist, batas ukuran body, rate limit global/API auth, dan header `X-Powered-By` dinonaktifkan. |
+| A06 Vulnerable and Outdated Components | Jalankan `npm audit` dan perbarui dependensi yang memiliki temuan HIGH atau CRITICAL sebelum rilis. |
+| A07 Identification and Authentication Failures | Access token singkat, refresh token dapat dicabut, pemeriksaan akun aktif/email terverifikasi, serta rate limit untuk endpoint auth. |
+| A08 Software and Data Integrity Failures | Commit `package-lock.json`, review perubahan dependency, dan jangan menjalankan artefak/dependency yang tidak tepercaya. |
+| A09 Security Logging and Monitoring Failures | Catat request dan audit action sensitif tanpa password, token, atau PII; pantau respons 401/403/429/5xx. |
+| A10 Server-Side Request Forgery (SSRF) | Jangan melakukan request server-side ke URL yang berasal dari pengguna tanpa allowlist, validasi DNS/IP, dan pembatasan redirect. |
+
 ## A. Autentikasi
 - [ ] Password di-hash (bcrypt/argon2), tidak pernah plaintext/di-log
 - [ ] JWT secret dari env, access token berumur pendek

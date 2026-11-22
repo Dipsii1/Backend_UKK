@@ -158,6 +158,7 @@ Jalankan dev server dan build sesuai script di `package.json` (jangan asumsikan 
 - **Secrets**: `.env` tidak di-commit. Cek `.gitignore` sebelum commit.
 - **Logging**: jangan log PII, token, atau password.
 - **Error handling**: global error handler, fail-closed, jangan bocorkan stack trace ke client di production.
+- **OWASP Top 10**: terapkan kontrol untuk A01–A10 sesuai checklist `src/docs/security.md`; gunakan `authenticate` sebelum `authorize` atau `authorizeSelfOrRole` pada endpoint terlindungi.
 - **Audit**: aksi sensitif (ubah status order/pembayaran, role, check-in) dicatat ke audit log.
 - **Admin**: approval event hanya dapat dilakukan saat status `pending_review`; approval mempublikasikan event dan harus dicatat ke audit log. Perubahan status user/organizer oleh admin juga wajib tercatat.
 - **Token one-time**: token reset password dan verifikasi email disimpan sebagai hash, memiliki expiry, dan hanya boleh dikonsumsi sekali secara atomik. Reset password mencabut refresh token aktif pengguna.

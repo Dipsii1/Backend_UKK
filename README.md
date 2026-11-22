@@ -232,6 +232,15 @@ Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock 
 
 ## 📝 Changelog
 
+### 2026-11-22 — OWASP Top 10 baseline
+
+- Menambahkan kontrol baseline OWASP Top 10: pembatasan request global API, pembatasan algoritme JWT ke HS256, validasi klaim JWT, pengamanan error autentikasi, pembersihan bucket rate limit, dan penghapusan header `X-Powered-By`.
+- Menambahkan pemetaan kontrol OWASP Top 10 di `src/docs/security.md`.
+
+### 2026-11-22 — Middleware authentication & authorization
+
+- Mengganti nama middleware menjadi `authenticate`, `authorize`, dan `authorizeSelfOrRole` agar peran autentikasi, otorisasi role, serta otorisasi kepemilikan lebih jelas.
+
 ### 2026-11-21 — Pendaftaran organizer
 
 - Menambahkan `POST /api/v1/auth/register-organizer` untuk pendaftaran langsung dari website sebagai role `organizer` dengan status `pending`.

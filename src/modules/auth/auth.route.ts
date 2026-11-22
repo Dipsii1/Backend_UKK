@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { AuthController } from "./auth.controller.js";
-import { requireAuth } from "../../middlewares/auth.middleware.js";
+import { authenticate } from "../../middlewares/auth.middleware.js";
 import { validate } from "../../middlewares/error.middleware.js";
 import { rateLimit } from "../../middlewares/security.middleware.js";
 import {
@@ -34,7 +34,7 @@ router.post("/verify-email/confirm", rateLimit(15 * 60 * 1000, 10), validate(ver
 router.get("/verify-email", AuthController.verifyEmailPage);
 
 // Protected routes
-router.use(requireAuth);
+router.use(authenticate);
 router.get("/me", AuthController.profile);
 router.patch("/me", validate(updateProfileSchema), AuthController.updateProfile);
 router.post("/logout", AuthController.logout);
