@@ -603,6 +603,7 @@ model ticket_types {
 
   event      events        @relation(fields: [event_id], references: [id])
   cartItems  cart_items[]
+  locks      ticket_locks[]
   orderItems order_items[]
 
   @@index([event_id])
@@ -623,6 +624,7 @@ model carts {
 
   user  users        @relation(fields: [user_id], references: [id])
   items cart_items[]
+  locks ticket_locks[]
 }
 
 model cart_items {
@@ -640,8 +642,28 @@ model cart_items {
   cart       carts        @relation(fields: [cart_id], references: [id])
   ticketType ticket_types @relation(fields: [ticket_type_id], references: [id])
 
+  @@unique([cart_id, ticket_type_id])
   @@index([cart_id])
   @@index([ticket_type_id])
+}
+
+model ticket_locks {
+  id BigInt @id @default(autoincrement())
+
+  cart_id        BigInt
+  ticket_type_id BigInt
+  quantity       Int
+  expires_at     DateTime
+
+  created_at DateTime @default(now())
+  updated_at DateTime? @updatedAt
+
+  cart       carts        @relation(fields: [cart_id], references: [id], onDelete: Cascade)
+  ticketType ticket_types @relation(fields: [ticket_type_id], references: [id], onDelete: Cascade)
+
+  @@unique([cart_id, ticket_type_id])
+  @@index([ticket_type_id, expires_at])
+  @@index([expires_at])
 }
 
 model orders {

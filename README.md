@@ -181,6 +181,17 @@ Semua endpoint berikut memerlukan JWT dengan role `organizer`; akses data juga d
 | `POST` | `/api/v1/organizer/tickets` | Buat tipe tiket dan kuota |
 | `GET`, `PATCH`, `DELETE` | `/api/v1/organizer/tickets/:id` | CRUD tiket dan manajemen kuota; kuota tidak boleh kurang dari penjualan |
 
+### Cart
+
+Semua endpoint cart memerlukan JWT. Item keranjang menahan kuota tiket selama 15 menit.
+
+| Method | Path | Keterangan |
+|:------:|------|------------|
+| `GET` | `/api/v1/cart` | Keranjang aktif beserta masa berlaku reservasi per item |
+| `PUT` | `/api/v1/cart/items` | Tambah atau ubah jumlah item; body: `ticket_type_id`, `quantity` |
+| `DELETE` | `/api/v1/cart/items/:ticketTypeId` | Hapus item dan lepaskan reservasi tiket |
+| `POST` | `/api/v1/cart/checkout` | Buat order pending dan kalkulasi voucher, admin fee, pajak, serta total |
+
 ### Admin
 
 Semua endpoint berikut memerlukan JWT dengan role `admin`. Perubahan status dan approval dicatat pada `audit_logs`.
@@ -231,6 +242,18 @@ npm run test:coverage
 Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock Prisma; test HTTP memock singleton Prisma sehingga tidak membutuhkan database atau layanan eksternal. Helper `tests/helpers/prisma.mock.ts` tersedia untuk test repository/unit yang membutuhkan Prisma mock dengan reset otomatis.
 
 ## 📝 Changelog
+
+### 2026-11-22 — Cart, ticket locking, dan checkout order
+
+- Menambahkan modul `cart` pada `/api/v1/cart`: melihat keranjang, menambah/memperbarui item, menghapus item, dan checkout.
+- Penambahan item membuat reservasi tiket sementara selama 15 menit melalui tabel `ticket_locks`; item yang dihapus atau kadaluarsa tidak lagi menahan kuota.
+- Checkout memakai Prisma interactive transaction ber-isolasi `Serializable` dan row lock PostgreSQL (`FOR UPDATE`) untuk tipe tiket serta voucher. Stok hanya ditambah untuk order pending yang berhasil dibuat; order pending yang kadaluarsa dilepas secara aman pada transaksi cart/checkout berikutnya.
+- Checkout menghitung dan menyimpan snapshot `subtotal`, diskon voucher, admin fee Rp5.000, PPN 11%, dan `total`; voucher divalidasi untuk masa aktif, kuota global, dan satu kali penggunaan per user.
+- Menambahkan migrasi `20261122093000_add_ticket_locks` dan dokumentasi Swagger untuk endpoint Cart.
+- Menyelaraskan struktur modul Cart dengan modul lain: route → controller → service → repository, pola parsing validasi controller, dan middleware per endpoint.
+- Merapikan gaya `CartRepository` agar mengikuti repository lain: pemanggilan Prisma, transaction client eksplisit, dan query multiline yang mudah ditinjau.
+- Menyamakan gaya file Cart lainnya (service, route, dan Swagger) dengan pola modul yang telah ada tanpa mengubah kontrak endpoint.
+- Menambahkan pemeriksaan ulang periode penjualan saat checkout, nomor order berbasis UUID kriptografis, dan audit untuk pembuatan maupun expiry order.
 
 ### 2026-11-22 — OWASP Top 10 baseline
 

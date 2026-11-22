@@ -14,6 +14,7 @@ import userRouter from "./modules/user/user.route.js";
 import eventRouter from "./modules/event/event.route.js";
 import organizerRouter from "./modules/organizer/organizer.route.js";
 import adminRouter from "./modules/admin/admin.route.js";
+import cartRouter from "./modules/cart/cart.route.js";
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.use("/api/v1/users", userRouter);
 app.use("/api/v1/events", eventRouter);
 app.use("/api/v1/organizer", organizerRouter);
 app.use("/api/v1/admin", adminRouter);
+app.use("/api/v1/cart", cartRouter);
 
 setupSwagger(app);
 app.use(errorHandler);

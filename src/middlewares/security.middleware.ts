@@ -3,13 +3,16 @@ import { TooManyRequestsError, ValidationError } from "../utils/app-error.js";
 
 type Bucket = { count: number; resetAt: number };
 
-export const requireNumericId = (req: Request, _res: Response, next: NextFunction): void => {
-  if (!/^[1-9]\d*$/.test(req.params.id as string)) {
-    next(new ValidationError("ID tidak valid", [{ field: "id", message: "Harus berupa angka positif" }]));
+export const requireNumericParam = (parameter: string) =>
+  (req: Request, _res: Response, next: NextFunction): void => {
+  if (!/^[1-9]\d*$/.test(req.params[parameter] as string)) {
+    next(new ValidationError("ID tidak valid", [{ field: parameter, message: "Harus berupa angka positif" }]));
     return;
   }
   next();
 };
+
+export const requireNumericId = requireNumericParam("id");
 
 export const rateLimit = (windowMs: number, max: number) => {
   const buckets = new Map<string, Bucket>();

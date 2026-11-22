@@ -41,6 +41,9 @@ Gunakan sebelum merge fitur sensitif (auth, order, pembayaran, check-in).
 ## D. Integritas Transaksi
 - [ ] Pembelian tiket, order, pembayaran dalam `$transaction`
 - [ ] Stok dicek dan dikurangi atomik (cegah overselling)
+- [ ] Cart menggunakan reservasi ber-expiry; add/update cart dan checkout memakai transaksi `Serializable` serta row lock berparameter pada tipe tiket.
+- [ ] Checkout memvalidasi ulang event published, periode penjualan, masa reservasi, dan kuota sebelum order dibuat.
+- [ ] Pembuatan order dan perubahan order menjadi expired dicatat di `audit_logs`.
 - [ ] Callback/konfirmasi pembayaran idempoten (aman diulang)
 - [ ] Check-in: tiket belum dipakai, order paid, event sesuai — satu transaksi
 

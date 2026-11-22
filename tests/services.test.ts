@@ -8,6 +8,7 @@ import { ForbiddenError } from "../src/utils/app-error.js";
 import { OrganizerService } from "../src/modules/organizer/organizer.service.js";
 import { ConflictError } from "../src/utils/app-error.js";
 import { AdminService } from "../src/modules/admin/admin.service.js";
+import { CartService } from "../src/modules/cart/cart.service.js";
 
 vi.mock("../src/utils/mailer.js", () => ({ sendMail: vi.fn().mockResolvedValue(undefined) }));
 
@@ -62,6 +63,31 @@ describe("OrganizerService", () => {
       summary: { paid_orders: 1, paid_tickets: 2, revenue: 200000, quota: 20, sold: 3 },
       ticket_types: [{ available: 17 }],
     });
+  });
+});
+
+describe("CartService", () => {
+  it("rejects cart item when the ticket quota is exhausted", async () => {
+    const repository = { upsertItem: vi.fn().mockResolvedValue({ reason: "sold_out" }) };
+    const service = new CartService(repository as never);
+
+    await expect(service.setItem(1n, { ticket_type_id: 2n, quantity: 1 })).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("rejects checkout when its temporary ticket lock has expired", async () => {
+    const repository = { checkout: vi.fn().mockResolvedValue({ reason: "lock_expired" }) };
+    const service = new CartService(repository as never);
+
+    await expect(service.checkout(1n, {})).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("returns the created order after an atomic checkout", async () => {
+    const order = { id: 9n, total: 116550 };
+    const repository = { checkout: vi.fn().mockResolvedValue({ reason: "ok", order }) };
+    const service = new CartService(repository as never);
+
+    await expect(service.checkout(1n, { voucher_code: "HEMAT10" })).resolves.toEqual(order);
+    expect(repository.checkout).toHaveBeenCalledWith(1n, "HEMAT10");
   });
 });
 

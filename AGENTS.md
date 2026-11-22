@@ -154,6 +154,7 @@ Jalankan dev server dan build sesuai script di `package.json` (jangan asumsikan 
 - **Authorization**: cek role/ownership di Route middleware **dan** Service (cegah IDOR — user hanya akses order/tiket miliknya; organizer hanya event miliknya).
 - **Injection**: query lewat Prisma (parameterized). Jangan pakai `$queryRawUnsafe` dengan input user.
 - **Pembayaran & order**: operasi yang mengubah stok tiket, order, dan pembayaran harus dalam **Prisma transaction** agar konsisten dan mencegah overselling.
+- **Cart & ticket locking**: cart item harus memiliki reservasi tiket ber-expiry. Perubahan reservasi dan checkout memakai interactive transaction `Serializable` serta row lock berparameter; stok order pending kadaluarsa harus dilepas secara atomik sebelum transaksi cart/checkout berikutnya memeriksa kuota.
 - **Check-in tiket**: validasi status tiket (belum dipakai, order sudah paid, event sesuai) dalam satu transaksi atomik.
 - **Secrets**: `.env` tidak di-commit. Cek `.gitignore` sebelum commit.
 - **Logging**: jangan log PII, token, atau password.
