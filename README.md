@@ -274,6 +274,14 @@ Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock 
 
 ## 📝 Changelog
 
+### 2026-11-23 — Konsistensi gaya kode antar module
+- Semua module mengikuti gaya `auth`: handler controller bertipe `(req: Request, res: Response)`, service dibuat dengan repository eksplisit, tanpa helper `getUserId`/`getIdParam`.
+- Validasi body dipindah dari controller ke `validate(schema)` di route untuk `admin`, `organizer`, `cart`, dan `payment`; validasi query tetap `parseSchema` di controller.
+- Route `organizer`, `cart`, dan `payment` memakai `router.use(authenticate, authorize(...))` dan pengelompokan komentar seperti `auth`/`admin`.
+- Tipe input organizer dipindah ke `organizer.types.ts`; `interface` di `cart.types.ts` dan `payment.types.ts` diganti `export type`.
+- `AdminRepository` dirapikan menjadi query multiline dan `tx: Prisma.TransactionClient` eksplisit (tanpa perubahan logika).
+- Catatan perilaku: pada route `organizer` dan `cart`, autentikasi kini dicek sebelum validasi ID, sehingga request tanpa token dengan ID tidak valid mendapat `401` (sebelumnya `400`).
+
 ### 2026-11-23 — Pembayaran Midtrans Snap (Sandbox)
 - Module baru `payment`: `POST /api/v1/payments/:orderId` membuat transaksi Snap dari order `pending` milik buyer. `order_id` = `order_number`, `gross_amount` dihitung server (total order dibulatkan ke rupiah), dan expiry Snap disamakan dengan `expired_at` order. Baris order di-lock agar tidak ada transaksi ganda; bila Midtrans gagal, slot payment dihapus agar bisa dicoba lagi.
 - `POST /api/v1/payments/midtrans/webhook`: verifikasi `signature_key` (timing-safe), cocokkan `gross_amount`, simpan setiap notifikasi ke `payment_logs`, lalu perbarui payment + order + stok + tiket dalam satu transaksi `Serializable`. Transisi status hanya maju (pending → final, settlement → refunded), jadi notifikasi duplikat tidak mengubah apa pun.

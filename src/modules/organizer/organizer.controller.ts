@@ -1,83 +1,80 @@
-import type { Request } from "express";
+import type { Request, Response } from "express";
+import { OrganizerRepository } from "./organizer.repository.js";
 import { OrganizerService } from "./organizer.service.js";
 import { sendSuccess } from "../../utils/api-response.js";
 import { asyncHandler } from "../../utils/async-handler.js";
 import { paginationSchema, parseSchema } from "../../utils/validation.js";
-import {
-  eventCreateSchema,
-  eventUpdateSchema,
-  ticketCreateSchema,
-  ticketUpdateSchema,
-} from "./organizer.validation.js";
 
-const organizerService = new OrganizerService();
-
-const getUserId = (req: Request) => req.userId!;
-const getIdParam = (req: Request) => BigInt(req.params.id as string);
+const organizerService = new OrganizerService(new OrganizerRepository());
 
 export class OrganizerController {
-  static listEvents = asyncHandler(async (req, res) => {
+  static listEvents = asyncHandler(async (req: Request, res: Response) => {
     const { page, limit } = parseSchema(paginationSchema, req.query);
-    const data = await organizerService.listEvents(getUserId(req), page, limit);
-    sendSuccess(res, data, "Daftar festival berhasil diambil");
+    const events = await organizerService.listEvents(req.userId!, page, limit);
+    sendSuccess(res, events, "Daftar festival berhasil diambil");
   });
 
-  static getEvent = asyncHandler(async (req, res) => {
-    const data = await organizerService.getEvent(getUserId(req), getIdParam(req));
-    sendSuccess(res, data, "Detail festival berhasil diambil");
+  static getEvent = asyncHandler(async (req: Request, res: Response) => {
+    const id = BigInt(req.params.id as string);
+    const event = await organizerService.getEvent(req.userId!, id);
+    sendSuccess(res, event, "Detail festival berhasil diambil");
   });
 
-  static createEvent = asyncHandler(async (req, res) => {
-    const input = parseSchema(eventCreateSchema, req.body);
-    const data = await organizerService.createEvent(getUserId(req), input);
-    sendSuccess(res, data, "Festival berhasil dibuat", 201);
+  static createEvent = asyncHandler(async (req: Request, res: Response) => {
+    const event = await organizerService.createEvent(req.userId!, req.body);
+    sendSuccess(res, event, "Festival berhasil dibuat", 201);
   });
 
-  static updateEvent = asyncHandler(async (req, res) => {
-    const input = parseSchema(eventUpdateSchema, req.body);
-    const data = await organizerService.updateEvent(getUserId(req), getIdParam(req), input);
-    sendSuccess(res, data, "Festival berhasil diperbarui");
+  static updateEvent = asyncHandler(async (req: Request, res: Response) => {
+    const id = BigInt(req.params.id as string);
+    const event = await organizerService.updateEvent(req.userId!, id, req.body);
+    sendSuccess(res, event, "Festival berhasil diperbarui");
   });
 
-  static deleteEvent = asyncHandler(async (req, res) => {
-    await organizerService.deleteEvent(getUserId(req), getIdParam(req));
+  static deleteEvent = asyncHandler(async (req: Request, res: Response) => {
+    const id = BigInt(req.params.id as string);
+    await organizerService.deleteEvent(req.userId!, id);
     res.status(204).send();
   });
 
-  static submitEvent = asyncHandler(async (req, res) => {
-    const data = await organizerService.submitEvent(getUserId(req), getIdParam(req));
-    sendSuccess(res, data, "Festival berhasil diajukan untuk direview admin");
+  static submitEvent = asyncHandler(async (req: Request, res: Response) => {
+    const id = BigInt(req.params.id as string);
+    const event = await organizerService.submitEvent(req.userId!, id);
+    sendSuccess(res, event, "Festival berhasil diajukan untuk direview admin");
   });
 
-  static listTickets = asyncHandler(async (req, res) => {
-    const data = await organizerService.listTickets(getUserId(req), getIdParam(req));
-    sendSuccess(res, data, "Daftar tiket berhasil diambil");
+  static listTickets = asyncHandler(async (req: Request, res: Response) => {
+    const id = BigInt(req.params.id as string);
+    const tickets = await organizerService.listTickets(req.userId!, id);
+    sendSuccess(res, tickets, "Daftar tiket berhasil diambil");
   });
 
-  static getTicket = asyncHandler(async (req, res) => {
-    const data = await organizerService.getTicket(getUserId(req), getIdParam(req));
-    sendSuccess(res, data, "Detail tiket berhasil diambil");
+  static getTicket = asyncHandler(async (req: Request, res: Response) => {
+    const id = BigInt(req.params.id as string);
+    const ticket = await organizerService.getTicket(req.userId!, id);
+    sendSuccess(res, ticket, "Detail tiket berhasil diambil");
   });
 
-  static createTicket = asyncHandler(async (req, res) => {
-    const input = parseSchema(ticketCreateSchema, req.body);
-    const data = await organizerService.createTicket(getUserId(req), input);
-    sendSuccess(res, data, "Tiket berhasil dibuat", 201);
+  static createTicket = asyncHandler(async (req: Request, res: Response) => {
+    const ticket = await organizerService.createTicket(req.userId!, req.body);
+    sendSuccess(res, ticket, "Tiket berhasil dibuat", 201);
   });
 
-  static updateTicket = asyncHandler(async (req, res) => {
-    const input = parseSchema(ticketUpdateSchema, req.body);
-    const data = await organizerService.updateTicket(getUserId(req), getIdParam(req), input);
-    sendSuccess(res, data, "Tiket dan kuota berhasil diperbarui");
+  static updateTicket = asyncHandler(async (req: Request, res: Response) => {
+    const id = BigInt(req.params.id as string);
+    const ticket = await organizerService.updateTicket(req.userId!, id, req.body);
+    sendSuccess(res, ticket, "Tiket dan kuota berhasil diperbarui");
   });
 
-  static deleteTicket = asyncHandler(async (req, res) => {
-    await organizerService.deleteTicket(getUserId(req), getIdParam(req));
+  static deleteTicket = asyncHandler(async (req: Request, res: Response) => {
+    const id = BigInt(req.params.id as string);
+    await organizerService.deleteTicket(req.userId!, id);
     res.status(204).send();
   });
 
-  static getSales = asyncHandler(async (req, res) => {
-    const data = await organizerService.getSales(getUserId(req), getIdParam(req));
-    sendSuccess(res, data, "Monitoring penjualan berhasil diambil");
+  static getSales = asyncHandler(async (req: Request, res: Response) => {
+    const id = BigInt(req.params.id as string);
+    const sales = await organizerService.getSales(req.userId!, id);
+    sendSuccess(res, sales, "Monitoring penjualan berhasil diambil");
   });
 }

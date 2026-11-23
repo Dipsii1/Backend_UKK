@@ -104,7 +104,8 @@ UserController → UserService → UserRepository → Prisma → PostgreSQL
 - `UserAuthRepository`: `findByEmail`, `findById`, `findAuthUserById`, `createBuyerUser`, `createOrganizerUser`, `createRefreshToken`, `findRefreshToken`, `revokeRefreshTokenIfActive`, `revokeAllUserRefreshTokens`, token reset password & verifikasi email.
 - `AuthService`: `register`, `registerOrganizer`, `login`, `getProfile`, `updateProfile`, `refresh`, `logout`, reset password, verifikasi email.
 - `UserRepository` / `UserService`: list (pagination), detail, update email/role, update nama, soft delete (`deactivate`).
-- Validasi input memakai `validate(schema)` di route atau `parseSchema(schema, input)` dari `src/utils/validation.ts` di controller. Jangan membuat helper parse baru per module.
+- Validasi body memakai `validate(schema)` di route; query string memakai `parseSchema(schema, req.query)` dari `src/utils/validation.ts` di controller. Jangan membuat helper parse baru per module.
+- Gaya kode mengikuti module `auth`: controller `static x = asyncHandler(async (req: Request, res: Response) => ...)`, service dibuat dengan repository-nya (`new XService(new XRepository())`), `req.userId!` / `BigInt(req.params.id as string)` ditulis langsung tanpa helper, route dikelompokkan dengan komentar dan `router.use(authenticate, authorize(...))` untuk grup terlindungi, tipe ditulis sebagai `export type` di `<domain>.types.ts`, query Prisma ditulis multiline.
 - Bila aturan bisnis harus berjalan di dalam interactive transaction (mis. cart/checkout), service mendefinisikan aturan dan menyuntikkannya ke repository (`CartRules`); repository hanya query, lock, dan tulis.
 - Fitur baru wajib mengikuti pola yang sama.
 

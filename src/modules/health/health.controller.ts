@@ -1,9 +1,10 @@
 import type { Request, Response } from "express";
+import { HealthRepository } from "./health.repository.js";
 import { HealthService } from "./health.service.js";
 import { sendError, sendSuccess } from "../../utils/api-response.js";
 import { asyncHandler } from "../../utils/async-handler.js";
 
-const healthService = new HealthService();
+const healthService = new HealthService(new HealthRepository());
 
 export class HealthController {
   static check = asyncHandler(async (_req: Request, res: Response) => {
