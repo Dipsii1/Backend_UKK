@@ -78,8 +78,9 @@ export class AuthController {
   });
 
   static resetPasswordPage = (req: Request, res: Response) => {
-    const token = req.query.token as string;
-    if (!token) {
+    const token = req.query.token;
+    // ?token=a&token=b menghasilkan array; tolak agar escapeHtml tidak crash.
+    if (typeof token !== "string" || !token) {
       res.status(400).send("<h1>Token tidak ditemukan</h1>");
       return;
     }

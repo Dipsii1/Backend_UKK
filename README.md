@@ -341,6 +341,7 @@ Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock 
 ## 📝 Changelog
 
 ### 2026-11-26 — Perbaikan hasil audit
+- Halaman `GET /auth/reset-password` kini menolak parameter `token` ganda (`?token=a&token=b`) dengan `400`, sebelumnya crash `500`.
 - Peta error lama berbasis `error.message` (`EMAIL_EXISTS`, dll.) di error handler dihapus karena tidak lagi dipakai; semua error domain memakai `AppError`.
 - Tiga salinan konversi Decimal → number disatukan menjadi `toNumber` di `src/utils/currency.ts`.
 - Test repository cart (`tests/cart-repository.test.ts`) untuk penjaga anti-oversell: kuota memperhitungkan reservasi cart lain, kursi terakhir tepat di kuota, checkout menaikkan `sold` dan mengosongkan cart, serta menolak bila stok sudah diambil atau reservasi kadaluarsa.

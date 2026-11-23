@@ -264,6 +264,11 @@ describe("HTTP routes", () => {
     expect(anonymous.status).toBe(401);
   });
 
+  it("rejects a reset password page with a duplicated token parameter instead of crashing", async () => {
+    const response = await request(app).get("/api/v1/auth/reset-password?token=a&token=b");
+    expect(response.status).toBe(400);
+  });
+
   it("restricts the cart to buyers", async () => {
     prismaMock.users.findUnique.mockResolvedValueOnce(admin);
     const response = await request(app).get("/api/v1/cart").set("Authorization", `Bearer ${tokenFor(2n)}`);
