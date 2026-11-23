@@ -17,6 +17,8 @@ import adminRouter from "./modules/admin/admin.route.js";
 import cartRouter from "./modules/cart/cart.route.js";
 import healthRouter from "./modules/health/health.route.js";
 import paymentRouter from "./modules/payment/payment.route.js";
+import ticketRouter from "./modules/ticket/ticket.route.js";
+import checkInRouter from "./modules/check-in/check-in.route.js";
 
 const app = express();
 
@@ -39,6 +41,8 @@ app.use("/api/v1/organizer", organizerRouter);
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/cart", cartRouter);
 app.use("/api/v1/payments", paymentRouter);
+app.use("/api/v1/me/tickets", ticketRouter);
+app.use("/api/v1/check-in", checkInRouter);
 
 setupSwagger(app);
 app.use(notFoundHandler);

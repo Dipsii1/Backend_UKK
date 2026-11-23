@@ -606,6 +606,7 @@ model ticket_types {
   cartItems  cart_items[]
   locks      ticket_locks[]
   orderItems order_items[]
+  tickets    tickets[]
 
   @@index([event_id])
   @@index([status])
@@ -691,6 +692,7 @@ model orders {
   orderItems    order_items[]
   voucherUsages voucher_usages[]
   payments      payments[]
+  tickets       tickets[]
 
   @@index([user_id])
   @@index([status])
@@ -807,8 +809,12 @@ model tickets {
   id        BigInt @id @default(autoincrement())
   public_id String @unique @default(uuid())
 
-  order_item_id BigInt
-  owner_id      BigInt
+  order_id       BigInt
+  order_item_id  BigInt
+  ticket_type_id BigInt
+  owner_id       BigInt
+  // Urutan tiket dalam satu order item (1..quantity); unik agar webhook ulang tidak menerbitkan tiket ganda.
+  sequence       Int
 
   ticket_code String @unique
   qr_token    String @unique
@@ -823,10 +829,15 @@ model tickets {
   created_at DateTime  @default(now())
   updated_at DateTime? @updatedAt
 
-  orderItem order_items    @relation(fields: [order_item_id], references: [id])
-  owner     users          @relation(fields: [owner_id], references: [id])
-  scans     ticket_scans[]
+  order      orders         @relation(fields: [order_id], references: [id])
+  orderItem  order_items    @relation(fields: [order_item_id], references: [id])
+  ticketType ticket_types   @relation(fields: [ticket_type_id], references: [id])
+  owner      users          @relation(fields: [owner_id], references: [id])
+  scans      ticket_scans[]
 
+  @@unique([order_item_id, sequence])
+  @@index([order_id])
+  @@index([ticket_type_id])
   @@index([order_item_id])
   @@index([owner_id])
   @@index([status])

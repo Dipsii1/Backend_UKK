@@ -223,6 +223,23 @@ Atur **Payment Notification URL** di Dashboard Midtrans Sandbox ke `https://<hos
 
 Pemetaan status: `settlement` / `capture` (fraud `accept`) → payment `settlement`, order `paid`, e-ticket terbit; `pending` → tetap pending; `deny`/`failure` → payment `failed`, order `cancelled`; `cancel` → payment `cancelled`, order `cancelled`; `expire` → `expired`; `refund` → `refunded` (tiket `issued` dibatalkan). Order batal/kadaluarsa melepas stok dan voucher. Settlement yang datang setelah order kadaluarsa tidak menerbitkan tiket dan dicatat di audit log (`needs_refund`).
 
+### E-Ticket (Buyer)
+
+Memerlukan JWT role `buyer`. Hanya tiket milik sendiri dari order `paid` yang dikembalikan; tiket buyer lain atau order belum dibayar → `404`.
+
+| Method | Endpoint | Keterangan |
+|--------|----------|------------|
+| `GET` | `/api/v1/me/tickets?page=&limit=` | Daftar e-ticket: event (judul, venue, `gate_open_at`, `start_at`, `end_at`), ticket type, `ticket_code`, status `UNUSED`/`USED`/`CANCELLED`/`EXPIRED`, dan `qr_code` (PNG data URL) |
+| `GET` | `/api/v1/me/tickets/:ticketId` | Detail satu e-ticket dengan field yang sama |
+
+E-ticket diterbitkan otomatis saat pembayaran terverifikasi: satu record per unit tiket, dengan `ticket_code` dan `qr_token` acak yang unik. QR hanya berisi `qr_token` (tanpa data pribadi/pembayaran) dan dirender saat diminta, tidak disimpan sebagai file.
+
+### Check-in
+
+| Method | Endpoint | Keterangan |
+|--------|----------|------------|
+| `POST` | `/api/v1/check-in` | (organizer pemilik event yang `verified`, atau admin) body `event_id`, `qr_token`. Sukses → status tiket `USED`. Token tidak dikenal `404`; tiket sudah dipakai / bukan untuk event ini / dibatalkan / order belum paid `409`. Setiap scan dicatat di `ticket_scans` |
+
 ### Admin
 
 Semua endpoint berikut memerlukan JWT dengan role `admin`. Perubahan status dan approval dicatat pada `audit_logs`.
@@ -273,6 +290,14 @@ npm run test:coverage
 Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock Prisma; test HTTP memock singleton Prisma sehingga tidak membutuhkan database atau layanan eksternal. Helper `tests/helpers/prisma.mock.ts` tersedia untuk test repository/unit yang membutuhkan Prisma mock dengan reset otomatis.
 
 ## 📝 Changelog
+
+### 2026-11-24 — E-ticket, QR, dan check-in
+- E-ticket diterbitkan saat order menjadi PAID: satu record per unit, `ticket_code` (UUID acak) dan `qr_token` (32 byte acak) unik. Tabel `tickets` kini berelasi langsung ke `orders` dan `ticket_types`, dengan kolom `sequence` dan constraint unik `(order_item_id, sequence)`; penerbitan memakai `skipDuplicates` sehingga webhook yang diproses ulang tidak menambah tiket.
+- Migrasi `20261124090000_add_eticket_relations` (backfill `order_id`, `ticket_type_id`, `sequence` untuk baris lama).
+- Module baru `ticket`: `GET /api/v1/me/tickets` dan `GET /api/v1/me/tickets/:ticketId` (buyer, hanya order PAID, QR sebagai PNG data URL dari `qr_token`).
+- Module baru `check-in`: `POST /api/v1/check-in` memvalidasi token, event, status order, dan status tiket dalam satu transaksi dengan row lock; scan dicatat ke `ticket_scans`, check-in sukses ke audit log.
+- Dependency baru `qrcode`. Test baru di `tests/eticket.test.ts`.
+- Belum termasuk: pengiriman e-ticket lewat email (subtask terpisah).
 
 ### 2026-11-23 — Konsistensi gaya kode antar module
 - Semua module mengikuti gaya `auth`: handler controller bertipe `(req: Request, res: Response)`, service dibuat dengan repository eksplisit, tanpa helper `getUserId`/`getIdParam`.

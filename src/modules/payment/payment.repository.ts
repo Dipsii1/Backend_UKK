@@ -118,15 +118,19 @@ export class PaymentRepository {
         }
 
         await tx.orders.update({ where: { id: order.id }, data: { status: "paid" } });
+        // Satu tiket per unit; (order_item_id, sequence) unik sehingga penerbitan ulang tidak menambah record.
         const tickets = items.flatMap((item) =>
-          Array.from({ length: item.quantity }, () => ({
+          Array.from({ length: item.quantity }, (_, index) => ({
+            order_id: order.id,
             order_item_id: item.id,
+            ticket_type_id: item.ticket_type_id,
             owner_id: order.user_id,
+            sequence: index + 1,
             ticket_code: `TCK-${randomUUID()}`,
             qr_token: randomBytes(32).toString("base64url"),
           })),
         );
-        await tx.tickets.createMany({ data: tickets });
+        await tx.tickets.createMany({ data: tickets, skipDuplicates: true });
         await tx.audit_logs.create({
           data: {
             user_id: order.user_id,

@@ -12,6 +12,7 @@
     { "key": "eventId", "value": "1" },
     { "key": "ticketId", "value": "1" },
     { "key": "orderId", "value": "1" },
+    { "key": "myTicketId", "value": "1" },
     { "key": "organizerId", "value": "1" },
     { "key": "verificationToken", "value": "" },
     { "key": "resetToken", "value": "" },
@@ -87,6 +88,14 @@
       "item": [
         { "name": "Create Midtrans Snap Transaction (Buyer)", "request": { "method": "POST", "url": "{{baseUrl}}/payments/{{orderId}}" } },
         { "name":  "Midtrans Webhook (dipanggil Midtrans)", "request":  { "auth":  { "type":  "noauth" }, "method":  "POST", "header":  [{ "key":  "Content-Type", "value":  "application/json" }], "body":  { "mode":  "raw", "raw":  "{\n  \"order_id\":  \"ORD-...\",\n  \"status_code\":  \"200\",\n  \"gross_amount\":  \"116550.00\",\n  \"signature_key\":  \"<SHA512(order_id+status_code+gross_amount+ServerKey)>\",\n  \"transaction_status\":  \"settlement\",\n  \"transaction_id\":  \"...\",\n  \"payment_type\":  \"bank_transfer\"\n}" }, "url":  "{{baseUrl}}/payments/midtrans/webhook" }}
+      ]
+    },
+    {
+      "name": "Tickets & Check-in",
+      "item": [
+        {"name": "My E-Tickets (Buyer)", "request": {"method": "GET", "url": "{{baseUrl}}/me/tickets?page=1&limit=10"}},
+        {"name": "My E-Ticket Detail (Buyer)", "request": {"method": "GET", "url": "{{baseUrl}}/me/tickets/{{myTicketId}}"}},
+        {"name": "Check-in Scan QR (Organizer/Admin)", "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"event_id\": \"{{eventId}}\",\n  \"qr_token\": \"<isi QR>\"\n}"}, "url": "{{baseUrl}}/check-in"}}
       ]
     }
   ]

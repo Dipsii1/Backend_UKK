@@ -68,6 +68,8 @@ Backend_UKK/
     │   ├── organizer/
     │   ├── cart/              # keranjang, ticket lock, checkout
     │   ├── payment/           # Midtrans Snap: buat transaksi & webhook notifikasi
+    │   ├── ticket/            # e-ticket buyer (GET /me/tickets) + QR
+    │   ├── check-in/          # scan & validasi QR e-ticket
     │   ├── health/            # GET /api/v1/health (cek koneksi database)
     │   └── admin/             # approval event, manajemen akun, monitoring sistem
     ├── middlewares/           # auth (JWT), role guard, validasi, error handler, rate limit, logger
@@ -165,7 +167,8 @@ Jalankan dev server dan build sesuai script di `package.json` (jangan asumsikan 
 - **Injection**: query lewat Prisma (parameterized). Jangan pakai `$queryRawUnsafe` dengan input user.
 - **Pembayaran & order**: operasi yang mengubah stok tiket, order, dan pembayaran harus dalam **Prisma transaction** agar konsisten dan mencegah overselling.
 - **Cart & ticket locking**: cart item harus memiliki reservasi tiket ber-expiry. Perubahan reservasi dan checkout memakai interactive transaction `Serializable` serta row lock berparameter; stok order pending kadaluarsa harus dilepas secara atomik sebelum transaksi cart/checkout berikutnya memeriksa kuota.
-- **Check-in tiket**: validasi status tiket (belum dipakai, order sudah paid, event sesuai) dalam satu transaksi atomik.
+- **Check-in tiket**: validasi status tiket (belum dipakai, order sudah paid, event sesuai) dalam satu transaksi atomik dengan `FOR UPDATE` pada baris tiket. Hanya organizer pemilik event (status `verified`) atau admin. Setiap scan dicatat di `ticket_scans`; scan tidak pernah membuat tiket.
+- **E-ticket**: diterbitkan hanya di transisi order `pending` → `paid` (di transaksi webhook yang sama), satu record per unit dengan `sequence` 1..quantity. Constraint unik `(order_item_id, sequence)` + `skipDuplicates` mencegah penerbitan ganda. QR hanya berisi `qr_token` acak, tidak pernah data pribadi/pembayaran. Endpoint buyer hanya mengembalikan tiket milik sendiri dari order `paid`.
 - **Secrets**: `.env` tidak di-commit. Cek `.gitignore` sebelum commit.
 - **Logging**: jangan log PII, token, atau password.
 - **Error handling**: global error handler, fail-closed, jangan bocorkan stack trace ke client di production.
