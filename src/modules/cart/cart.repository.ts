@@ -107,6 +107,11 @@ export class CartRepository {
     }
   }
 
+  // Dipanggil job berkala agar stok order yang tidak dibayar kembali walau tidak ada aktivitas cart.
+  async expireStaleOrders() {
+    await runSerializable((tx) => this.expirePendingOrders(tx, new Date()));
+  }
+
   async getCart(userId: bigint) {
     const now = new Date();
 

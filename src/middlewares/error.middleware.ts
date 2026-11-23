@@ -97,12 +97,12 @@ export const errorHandler = (
       return;
     }
 
-    if (env.NODE_ENV === "development") {
-      console.error(`[INTERNAL_ERROR] ${req.method} ${req.path}:`, error);
-    }
+    // Selalu dicatat (termasuk production) agar error tak terduga bisa dilacak; stack hanya dikirim ke client saat development.
+    console.error(`[INTERNAL_ERROR] ${req.method} ${req.path}:`, error);
     sendError(res, "INTERNAL_ERROR", "Kesalahan server internal", 500, env.NODE_ENV === "development" ? { name: error.name, message: error.message, stack: error.stack } : undefined);
     return;
   }
 
+  console.error(`[INTERNAL_ERROR] ${req.method} ${req.path}:`, error);
   sendError(res, "INTERNAL_ERROR", "Kesalahan server internal", 500);
 };

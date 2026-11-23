@@ -91,6 +91,10 @@ const serializeCart = (cart: Awaited<ReturnType<CartRepository["getCart"]>>) => 
 export class CartService {
   constructor(private readonly cartRepo: CartRepository = new CartRepository(cartRules)) {}
 
+  async expireStaleOrders() {
+    await this.cartRepo.expireStaleOrders();
+  }
+
   async getCart(userId: bigint) {
     return serializeCart(await this.cartRepo.getCart(userId));
   }

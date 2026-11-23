@@ -21,6 +21,8 @@ import ticketRouter from "./modules/ticket/ticket.route.js";
 import checkInRouter from "./modules/check-in/check-in.route.js";
 import notificationRouter from "./modules/notification/notification.route.js";
 import { initSocket } from "./lib/socket.js";
+import { CartRepository } from "./modules/cart/cart.repository.js";
+import { CartService, cartRules } from "./modules/cart/cart.service.js";
 
 const app = express();
 
@@ -61,5 +63,11 @@ if (isEntryPoint) {
       console.log(`Server running at http://localhost:${env.PORT}`);
     });
     initSocket(server);
+
+    // shortcut: interval per proses, cukup untuk satu instance; pindah ke satu worker/cron bila server di-scale horizontal.
+    const cartService = new CartService(new CartRepository(cartRules));
+    setInterval(() => {
+      cartService.expireStaleOrders().catch((error) => console.error("Gagal melepas order kadaluarsa:", error));
+    }, 60_000);
   });
 }
