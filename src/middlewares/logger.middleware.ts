@@ -26,7 +26,7 @@ export const requestLogger = (req: Request, res: Response, next: NextFunction): 
     const line =
       `${color.gray}${timestamp}${color.reset} ` +
       `${color.cyan}${req.method}${color.reset} ` +
-      `${req.originalUrl} ` +
+      `${req.originalUrl.split("?")[0]} ` + // query bisa berisi token one-time
       `${statusColor(status)}${status}${color.reset} ` +
       `${color.gray}${durationMs.toFixed(1)}ms${color.reset}`;
 

@@ -217,17 +217,20 @@ export class UserAuthRepository {
     });
   }
 
-  async setEmailVerified(userId: bigint) {
-    return prisma.users.update({
-      where: { id: userId },
-      data: { email_verified: true },
-    });
-  }
-
+  // Konsumsi token dan tandai email terverifikasi dalam satu transaksi.
   async consumeEmailVerificationToken(id: bigint) {
-    return prisma.email_verifications.updateMany({
-      where: { id, verified_at: null, expired_at: { gt: new Date() } },
-      data: { verified_at: new Date() },
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const consumed = await tx.email_verifications.updateMany({
+        where: { id, verified_at: null, expired_at: { gt: new Date() } },
+        data: { verified_at: new Date() },
+      });
+      if (consumed.count > 0) {
+        await tx.users.updateMany({
+          where: { emailVerifications: { some: { id } } },
+          data: { email_verified: true },
+        });
+      }
+      return consumed;
     });
   }
 }

@@ -1,6 +1,51 @@
 import { CartRepository } from "./cart.repository.js";
 import { ConflictError, NotFoundError } from "../../utils/app-error.js";
-import type { CartItemInput, CheckoutInput } from "./cart.types.js";
+import type { CartItemInput, CartRules, CheckoutInput } from "./cart.types.js";
+
+const TAX_RATE = 0.11;
+const SERVICE_FEE = 5000;
+
+const money = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+const withinWindow = (start: Date | null, end: Date | null, now: Date) =>
+  (start === null || start <= now) && (end === null || end >= now);
+
+export const cartRules: CartRules = {
+  lockMinutes: 15,
+
+  isSellable(ticket, now) {
+    return (
+      ticket.status === "active" &&
+      ticket.event.status === "published" &&
+      ticket.event.is_published &&
+      ticket.event.end_at > now &&
+      withinWindow(ticket.sale_start_at, ticket.sale_end_at, now) &&
+      withinWindow(ticket.event.sales_start_at, ticket.event.sales_end_at, now)
+    );
+  },
+
+  isVoucherUsable(voucher, usage, now) {
+    return (
+      voucher.is_active &&
+      withinWindow(voucher.start_at, voucher.end_at, now) &&
+      (voucher.quota === null || usage.total < voucher.quota) &&
+      usage.byUser === 0
+    );
+  },
+
+  calculateTotals(items, voucher) {
+    const subtotal = money(items.reduce((total, item) => total + item.price * item.quantity, 0));
+    const rawDiscount = !voucher
+      ? 0
+      : voucher.discount_type === "percentage"
+        ? (subtotal * voucher.discount_value) / 100
+        : voucher.discount_value;
+    // max_discount null = tanpa batas; 0 berarti benar-benar 0.
+    const discount = money(Math.min(rawDiscount, voucher?.max_discount ?? Infinity, subtotal));
+    const taxable = money(subtotal - discount + SERVICE_FEE);
+    const tax = money(taxable * TAX_RATE);
+    return { subtotal, discount, service_fee: SERVICE_FEE, tax, total: money(taxable + tax) };
+  },
+};
 
 const serializeCart = (cart: Awaited<ReturnType<CartRepository["getCart"]>>) => {
   if (!cart) return { items: [], subtotal: 0 };
@@ -29,7 +74,7 @@ const serializeCart = (cart: Awaited<ReturnType<CartRepository["getCart"]>>) => 
 };
 
 export class CartService {
-  constructor(private readonly cartRepo: CartRepository = new CartRepository()) {}
+  constructor(private readonly cartRepo: CartRepository = new CartRepository(cartRules)) {}
 
   async getCart(userId: bigint) {
     return serializeCart(await this.cartRepo.getCart(userId));
@@ -60,6 +105,9 @@ export class CartService {
     }
     if (result.reason === "unavailable") throw new ConflictError("Tiket tidak lagi tersedia");
     if (result.reason === "invalid_voucher") throw new ConflictError("Voucher tidak valid atau tidak dapat digunakan");
+    if (result.reason === "max_purchase") {
+      throw new ConflictError(`Maksimal pembelian tiket ini adalah ${result.maxPurchase}`);
+    }
     return result.order;
   }
 }

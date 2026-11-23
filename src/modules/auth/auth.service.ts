@@ -25,7 +25,7 @@ import type {
   ResetPasswordResult,
 } from "./auth.types.js";
 
-const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const REFRESH_TTL_MS = env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000;
 const EMAIL_VERIFICATION_TTL_MS = 1 * 60 * 60 * 1000;
 
 const hashPassword = (password: string) => bcrypt.hash(password, env.BCRYPT_ROUNDS);
@@ -33,12 +33,12 @@ const comparePassword = (password: string, hash: string) => bcrypt.compare(passw
 const hashToken = (token: string) => crypto.createHash("sha256").update(token).digest("hex");
 
 const signAccessToken = (userId: bigint): string =>
-  jwt.sign({ sub: userId.toString() }, env.JWT_SECRET, {
+  jwt.sign({ sub: userId.toString(), type: "access" }, env.JWT_SECRET, {
     expiresIn: env.JWT_EXPIRES_IN as jwt.SignOptions["expiresIn"],
   });
 
 const signRefreshToken = (userId: bigint): string =>
-  jwt.sign({ sub: userId.toString(), jti: crypto.randomUUID() }, env.JWT_SECRET, {
+  jwt.sign({ sub: userId.toString(), type: "refresh", jti: crypto.randomUUID() }, env.JWT_SECRET, {
     expiresIn: `${env.REFRESH_TOKEN_TTL_DAYS}d` as jwt.SignOptions["expiresIn"],
   });
 
@@ -59,7 +59,7 @@ export class AuthService {
     await this.userAuthRepo.createEmailVerificationToken({
       userId: user.id,
       token: hashToken(verifyToken),
-      expiredAt: new Date(Date.now() + 60 * 60 * 1000),
+      expiredAt: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS),
     });
 
     try {
@@ -181,7 +181,11 @@ export class AuthService {
   async refresh(oldRefreshToken: string): Promise<RefreshResult> {
     let userId: bigint;
     try {
-      userId = BigInt((jwt.verify(oldRefreshToken, env.JWT_SECRET) as { sub: string }).sub);
+      const payload = jwt.verify(oldRefreshToken, env.JWT_SECRET, { algorithms: ["HS256"] });
+      if (typeof payload !== "object" || payload.type !== "refresh" || typeof payload.sub !== "string") {
+        throw new Error("Invalid refresh token");
+      }
+      userId = BigInt(payload.sub);
     } catch {
       throw new UnauthorizedError("Token tidak valid atau sudah kadaluarsa");
     }
@@ -219,7 +223,7 @@ export class AuthService {
       await this.userAuthRepo.createPasswordResetToken({
         userId: user.id,
         token: hashToken(resetToken),
-        expiredAt: new Date(Date.now() + 60 * 60 * 1000),
+        expiredAt: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS),
       });
 
       try {
@@ -261,7 +265,7 @@ export class AuthService {
       await this.userAuthRepo.createEmailVerificationToken({
         userId: user.id,
         token: hashToken(verifyToken),
-        expiredAt: new Date(Date.now() + 60 * 60 * 1000),
+        expiredAt: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS),
       });
 
       try {
@@ -288,7 +292,6 @@ export class AuthService {
     if (consumed.count === 0) {
       throw new UnauthorizedError("Token verifikasi tidak valid atau sudah kadaluarsa");
     }
-    await this.userAuthRepo.setEmailVerified(verification.user.id);
     return { message: "Email berhasil diverifikasi" };
   }
 }

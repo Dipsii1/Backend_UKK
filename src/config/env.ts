@@ -16,6 +16,7 @@ const schema = z.object({
   BCRYPT_ROUNDS: z.coerce.number().int().min(4).max(15).default(12),
   CLIENT_URL: z.url().default("http://localhost:3000"),
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
+  TRUST_PROXY: boolFromString,
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().optional(),
   SMTP_SECURE: boolFromString,

@@ -23,7 +23,8 @@ export const authenticate = async (req: Request, _res: Response, next: NextFunct
   let userId: bigint;
   try {
     const payload = jwt.verify(token, env.JWT_SECRET, { algorithms: ["HS256"] });
-    if (typeof payload !== "object" || payload === null || typeof payload.sub !== "string" || !/^[1-9]\d*$/.test(payload.sub)) {
+    // type wajib "access": refresh token (secret sama) tidak boleh dipakai sebagai access token.
+    if (typeof payload !== "object" || payload === null || payload.type !== "access" || typeof payload.sub !== "string" || !/^[1-9]\d*$/.test(payload.sub)) {
       throw new Error("Invalid JWT subject");
     }
     userId = BigInt(payload.sub);

@@ -3,11 +3,6 @@ import { z } from "zod";
 const optionalString = z.string().trim().min(1).optional();
 const optionalDate = z.coerce.date().optional();
 
-export const paginationSchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(10),
-});
-
 export const eventCreateSchema = z.object({
   category_id: z.coerce.bigint().positive(),
   venue_id: z.coerce.bigint().positive(),

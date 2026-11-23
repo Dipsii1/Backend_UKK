@@ -1,8 +1,10 @@
 import type { Request, Response, NextFunction } from "express";
 import { ZodError, type ZodSchema } from "zod";
 import { env } from "../config/env.js";
+import { Prisma } from "../generated/prisma/client.js";
 import { AppError, ValidationError, ConflictError, UnauthorizedError, ForbiddenError, NotFoundError } from "../utils/app-error.js";
 import { sendError } from "../utils/api-response.js";
+import { parseSchema } from "../utils/validation.js";
 
 const errorMap: Record<string, AppError> = {
   EMAIL_EXISTS: new ConflictError("Email sudah terdaftar"),
@@ -12,21 +14,29 @@ const errorMap: Record<string, AppError> = {
   NOT_FOUND: new NotFoundError("Tidak ditemukan"),
 };
 
+const prismaErrorMap: Record<string, AppError> = {
+  P2002: new ConflictError("Data sudah digunakan"),
+  P2003: new ConflictError("Data terkait tidak valid atau masih digunakan"),
+  P2025: new NotFoundError("Data tidak ditemukan"),
+  P2034: new ConflictError("Terjadi konflik transaksi, silakan coba lagi"),
+};
+
+type HttpError = Error & { status?: number; type?: string; expose?: boolean };
+
 export const validate =
   (schema: ZodSchema) =>
   (req: Request, _res: Response, next: NextFunction): void => {
-    const result = schema.safeParse(req.body);
-    if (!result.success) {
-      const errors = result.error.issues.map(({ path, message }) => ({
-        field: path.join("."),
-        message,
-      }));
-      next(new ValidationError("Validasi gagal", errors));
-      return;
+    try {
+      req.body = parseSchema(schema, req.body);
+      next();
+    } catch (error) {
+      next(error);
     }
-    req.body = result.data;
-    next();
   };
+
+export const notFoundHandler = (_req: Request, res: Response): void => {
+  sendError(res, "NOT_FOUND", "Endpoint tidak ditemukan", 404);
+};
 
 export const errorHandler = (
   error: unknown,
@@ -44,7 +54,7 @@ export const errorHandler = (
       field: path.join("."),
       message,
     }));
-    sendError(res, "VALIDATION_ERROR", "Validasi gagal", 422, errors);
+    sendError(res, "VALIDATION_ERROR", "Validasi gagal", 400, errors);
     return;
   }
 
@@ -56,7 +66,28 @@ export const errorHandler = (
     return;
   }
 
+  if (error instanceof Prisma.PrismaClientKnownRequestError && prismaErrorMap[error.code]) {
+    const mapped = prismaErrorMap[error.code];
+    sendError(res, mapped.code, mapped.message, mapped.statusCode);
+    return;
+  }
+
   if (error instanceof Error) {
+    // Error dari body-parser (JSON rusak, body terlalu besar) membawa status 4xx.
+    const httpError = error as HttpError;
+    if (httpError.type === "entity.parse.failed") {
+      sendError(res, "VALIDATION_ERROR", "Format JSON tidak valid", 400);
+      return;
+    }
+    if (httpError.type === "entity.too.large") {
+      sendError(res, "PAYLOAD_TOO_LARGE", "Ukuran body terlalu besar", 413);
+      return;
+    }
+    if (httpError.expose && httpError.status && httpError.status >= 400 && httpError.status < 500) {
+      sendError(res, "BAD_REQUEST", "Permintaan tidak valid", httpError.status);
+      return;
+    }
+
     const mapped = errorMap[error.message];
     if (mapped) {
       if (env.NODE_ENV === "development") {

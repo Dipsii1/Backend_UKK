@@ -3,14 +3,15 @@ import jwt from "jsonwebtoken";
 import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { env } from "../src/config/env.js";
+import { Prisma } from "../src/generated/prisma/client.js";
 
 const prismaMock = vi.hoisted(() => ({
   $transaction: vi.fn(),
   events: { findFirst: vi.fn(), findMany: vi.fn(), count: vi.fn() },
   roles: { upsert: vi.fn() },
   organizers: { findUnique: vi.fn(), create: vi.fn() },
-  users: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), findMany: vi.fn(), delete: vi.fn() },
-  user_profiles: { create: vi.fn(), update: vi.fn() },
+  users: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn(), findMany: vi.fn(), count: vi.fn(), delete: vi.fn() },
+  user_profiles: { create: vi.fn(), update: vi.fn(), upsert: vi.fn() },
   refresh_tokens: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   password_resets: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
   email_verifications: { create: vi.fn(), findUnique: vi.fn(), updateMany: vi.fn() },
@@ -33,7 +34,8 @@ const buyer = {
 };
 
 const admin = { ...buyer, id: 2n, public_id: "user-2", email: "admin@example.com", role: { name: "admin" } };
-const tokenFor = (id: bigint) => jwt.sign({ sub: id.toString() }, env.JWT_SECRET, { expiresIn: "15m" });
+const tokenFor = (id: bigint) => jwt.sign({ sub: id.toString(), type: "access" }, env.JWT_SECRET, { expiresIn: "15m" });
+const refreshTokenFor = (id: bigint) => jwt.sign({ sub: id.toString(), type: "refresh" }, env.JWT_SECRET, { expiresIn: "7d" });
 
 const setDefaults = () => {
   prismaMock.$transaction.mockResolvedValue([[], 0]);
@@ -57,7 +59,7 @@ describe("HTTP routes", () => {
 
   it("rejects invalid event query input", async () => {
     const response = await request(app).get("/api/v1/events?limit=101");
-    expect(response.status).toBe(422);
+    expect(response.status).toBe(400);
   });
 
   it("returns not found and database error for event detail/list", async () => {
@@ -72,7 +74,7 @@ describe("HTTP routes", () => {
     const register = await request(app).post("/api/v1/auth/register").send({ email: "invalid" });
     const login = await request(app).post("/api/v1/auth/login").send({ email: "invalid", password: "" });
     const refresh = await request(app).post("/api/v1/auth/refresh-token").send({});
-    expect([register.status, login.status, refresh.status]).toEqual([422, 422, 422]);
+    expect([register.status, login.status, refresh.status]).toEqual([400, 400, 400]);
   });
 
   it("registers a buyer and returns no password", async () => {
@@ -180,7 +182,7 @@ describe("HTTP routes", () => {
   });
 
   it("refreshes a valid token and confirms email verification", async () => {
-    const refreshToken = tokenFor(1n);
+    const refreshToken = refreshTokenFor(1n);
     prismaMock.refresh_tokens.findUnique.mockResolvedValueOnce({ id: 9n, revoked_at: null, expired_at: new Date(Date.now() + 60_000) });
     prismaMock.users.findUnique.mockResolvedValueOnce(buyer);
     prismaMock.refresh_tokens.updateMany.mockResolvedValueOnce({ count: 1 });
@@ -188,8 +190,9 @@ describe("HTTP routes", () => {
     const refreshed = await request(app).post("/api/v1/auth/refresh-token").send({ refreshToken });
 
     prismaMock.email_verifications.findUnique.mockResolvedValueOnce({ id: 8n, expired_at: new Date(Date.now() + 60_000), verified_at: null, user: buyer });
+    prismaMock.$transaction.mockImplementationOnce(async (callback: (tx: typeof prismaMock) => unknown) => callback(prismaMock));
     prismaMock.email_verifications.updateMany.mockResolvedValueOnce({ count: 1 });
-    prismaMock.users.update.mockResolvedValueOnce({});
+    prismaMock.users.updateMany.mockResolvedValueOnce({ count: 1 });
     const verified = await request(app).post("/api/v1/auth/verify-email/confirm").send({ token: "valid-token" });
 
     expect([refreshed.status, verified.status]).toEqual([200, 200]);
@@ -218,7 +221,7 @@ describe("HTTP routes", () => {
     prismaMock.users.findUnique.mockResolvedValueOnce(buyer).mockResolvedValueOnce({ id: 1n, email: "changed@example.com" });
     const update = await request(app).put("/api/v1/users/1").set("Authorization", `Bearer ${tokenFor(1n)}`).send({ email: "changed@example.com" });
     prismaMock.users.findUnique.mockResolvedValueOnce(buyer).mockResolvedValueOnce({ id: 1n, email: buyer.email }).mockResolvedValueOnce({ id: 1n, email: buyer.email });
-    prismaMock.user_profiles.update.mockResolvedValueOnce({});
+    prismaMock.user_profiles.upsert.mockResolvedValueOnce({});
     const profile = await request(app).patch("/api/v1/users/1/profile").set("Authorization", `Bearer ${tokenFor(1n)}`).send({ full_name: "Changed Name" });
     prismaMock.users.findUnique.mockResolvedValueOnce(buyer).mockResolvedValueOnce({ id: 1n, email: buyer.email });
     const get = await request(app).get("/api/v1/users/1").set("Authorization", `Bearer ${tokenFor(1n)}`);
@@ -226,5 +229,31 @@ describe("HTTP routes", () => {
     prismaMock.users.delete.mockResolvedValueOnce({ id: 1n });
     const deleted = await request(app).delete("/api/v1/users/1").set("Authorization", `Bearer ${tokenFor(2n)}`);
     expect([update.status, profile.status, get.status, deleted.status]).toEqual([200, 200, 200, 200]);
+  });
+  it("rejects a refresh token used as an access token", async () => {
+    prismaMock.users.findUnique.mockResolvedValueOnce(buyer);
+    const response = await request(app).get("/api/v1/auth/me").set("Authorization", `Bearer ${refreshTokenFor(1n)}`);
+    expect(response.status).toBe(401);
+  });
+
+  it("returns JSON 400 for malformed JSON and JSON 404 for unknown routes", async () => {
+    const malformed = await request(app).post("/api/v1/auth/login").set("Content-Type", "application/json").send("{bad json");
+    const unknown = await request(app).get("/api/v1/does-not-exist");
+    expect([malformed.status, unknown.status]).toEqual([400, 404]);
+    expect(unknown.body).toMatchObject({ success: false, code: "NOT_FOUND" });
+  });
+
+  it("maps Prisma unique constraint violations to 409", async () => {
+    prismaMock.$transaction.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError("Unique constraint failed", { code: "P2002", clientVersion: "test" }),
+    );
+    const response = await request(app).post("/api/v1/auth/register").send({ email: "race@example.com", password: "Password123!", fullName: "Race User" });
+    expect(response.status).toBe(409);
+  });
+
+  it("restricts the cart to buyers", async () => {
+    prismaMock.users.findUnique.mockResolvedValueOnce(admin);
+    const response = await request(app).get("/api/v1/cart").set("Authorization", `Bearer ${tokenFor(2n)}`);
+    expect(response.status).toBe(403);
   });
 });

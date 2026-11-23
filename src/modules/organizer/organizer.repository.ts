@@ -44,15 +44,28 @@ export class OrganizerRepository {
     return prisma.events.update({ where: { id }, data });
   }
 
+  // Hapus tipe tiket (beserta item cart yang mereferensikannya) lalu event, secara atomik.
   async deleteEvent(id: bigint) {
-    return prisma.events.delete({ where: { id } });
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      await tx.cart_items.deleteMany({ where: { ticketType: { event_id: id } } });
+      await tx.ticket_types.deleteMany({ where: { event_id: id } });
+      await tx.events.delete({ where: { id } });
+    });
+  }
+
+  async countOrderItemsByEvent(eventId: bigint) {
+    return prisma.order_items.count({ where: { ticketType: { event_id: eventId } } });
+  }
+
+  async countOrderItemsByTicket(ticketTypeId: bigint) {
+    return prisma.order_items.count({ where: { ticket_type_id: ticketTypeId } });
   }
 
   async findTicketByIdAndOrganizer(id: bigint, organizerId: bigint) {
     return prisma.ticket_types.findFirst({
       where: { id, event: { organizer_id: organizerId } },
       include: {
-        event: { select: { id: true, title: true, organizer_id: true } },
+        event: { select: { id: true, title: true, organizer_id: true, status: true } },
       },
     });
   }
@@ -73,7 +86,10 @@ export class OrganizerRepository {
   }
 
   async deleteTicket(id: bigint) {
-    return prisma.ticket_types.delete({ where: { id } });
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      await tx.cart_items.deleteMany({ where: { ticket_type_id: id } });
+      await tx.ticket_types.delete({ where: { id } });
+    });
   }
 
   async findSalesByEvent(eventId: bigint, organizerId: bigint) {

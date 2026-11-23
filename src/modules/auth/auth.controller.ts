@@ -4,6 +4,7 @@ import { AuthService } from "./auth.service.js";
 import { sendSuccess } from "../../utils/api-response.js";
 import { asyncHandler } from "../../utils/async-handler.js";
 import { ValidationError } from "../../utils/app-error.js";
+import { env } from "../../config/env.js";
 
 const authService = new AuthService(new UserAuthRepository());
 
@@ -18,9 +19,9 @@ const escapeHtml = (value: string): string =>
 
 const cookieOptions = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
+  secure: env.NODE_ENV === "production",
   sameSite: "lax" as const,
-  maxAge: 7 * 24 * 60 * 60 * 1000,
+  maxAge: env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000,
 };
 
 export class AuthController {
@@ -106,14 +107,14 @@ export class AuthController {
             const res = await fetch('/api/v1/auth/reset-password/confirm', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ token: formData.token, newPassword: formData.newPassword.value })
+              body: JSON.stringify({ token: formData.get('token'), newPassword: formData.get('newPassword') })
             });
             const data = await res.json();
             alert(data.message);
-            if (res.ok) window.location.href = '${process.env.CLIENT_URL || 'http://localhost:3000'}';
+            if (res.ok) window.location.href = '${env.CLIENT_URL}';
           };
         </script>
-        <p style="margin-top: 20px;"><a href="${process.env.CLIENT_URL || 'http://localhost:3000'}">Batal</a></p>
+        <p style="margin-top: 20px;"><a href="${env.CLIENT_URL}">Batal</a></p>
       </body>
       </html>
     `);
@@ -145,7 +146,7 @@ export class AuthController {
         <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
           <h2>Email Berhasil Diverifikasi!</h2>
           <p>Selamat, akun Anda kini telah terverifikasi.</p>
-          <p><a href="${process.env.CLIENT_URL || 'http://localhost:3000'}">Kembali ke aplikasi</a></p>
+          <p><a href="${env.CLIENT_URL}">Kembali ke aplikasi</a></p>
         </body>
         </html>
       `);
@@ -157,7 +158,7 @@ export class AuthController {
         <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
           <h2>Verifikasi Gagal</h2>
           <p>Token tidak valid atau sudah kadaluarsa.</p>
-          <p><a href="${process.env.CLIENT_URL || 'http://localhost:3000'}">Coba lagi</a></p>
+          <p><a href="${env.CLIENT_URL}">Coba lagi</a></p>
         </body>
         </html>
       `);
