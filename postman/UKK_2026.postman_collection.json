@@ -11,6 +11,7 @@
     { "key": "userId", "value": "1" },
     { "key": "eventId", "value": "1" },
     { "key": "ticketId", "value": "1" },
+    { "key": "orderId", "value": "1" },
     { "key": "organizerId", "value": "1" },
     { "key": "verificationToken", "value": "" },
     { "key": "resetToken", "value": "" },
@@ -79,6 +80,13 @@
         { "name": "Update Organizer Status", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"status\": \"verified\"\n}" }, "url": "{{baseUrl}}/admin/organizers/{{organizerId}}/status" } },
         { "name": "System Dashboard", "request": { "method": "GET", "url": "{{baseUrl}}/admin/dashboard" } },
         { "name": "Transaction Logs", "request": { "method": "GET", "url": "{{baseUrl}}/admin/transaction-logs?page=1&limit=10&status=paid&start_date=2026-01-01T00:00:00.000Z&end_date=2026-12-31T23:59:59.999Z" } }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        { "name": "Create Midtrans Snap Transaction (Buyer)", "request": { "method": "POST", "url": "{{baseUrl}}/payments/{{orderId}}" } },
+        { "name":  "Midtrans Webhook (dipanggil Midtrans)", "request":  { "auth":  { "type":  "noauth" }, "method":  "POST", "header":  [{ "key":  "Content-Type", "value":  "application/json" }], "body":  { "mode":  "raw", "raw":  "{\n  \"order_id\":  \"ORD-...\",\n  \"status_code\":  \"200\",\n  \"gross_amount\":  \"116550.00\",\n  \"signature_key\":  \"<SHA512(order_id+status_code+gross_amount+ServerKey)>\",\n  \"transaction_status\":  \"settlement\",\n  \"transaction_id\":  \"...\",\n  \"payment_type\":  \"bank_transfer\"\n}" }, "url":  "{{baseUrl}}/payments/midtrans/webhook" }}
       ]
     }
   ]

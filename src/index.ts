@@ -16,6 +16,7 @@ import organizerRouter from "./modules/organizer/organizer.route.js";
 import adminRouter from "./modules/admin/admin.route.js";
 import cartRouter from "./modules/cart/cart.route.js";
 import healthRouter from "./modules/health/health.route.js";
+import paymentRouter from "./modules/payment/payment.route.js";
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use("/api/v1/events", eventRouter);
 app.use("/api/v1/organizer", organizerRouter);
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/cart", cartRouter);
+app.use("/api/v1/payments", paymentRouter);
 
 setupSwagger(app);
 app.use(notFoundHandler);

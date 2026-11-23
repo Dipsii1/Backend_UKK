@@ -82,7 +82,7 @@ export class AdminRepository {
       ...((filters.start_date || filters.end_date) ? { created_at: { ...(filters.start_date ? { gte: filters.start_date } : {}), ...(filters.end_date ? { lte: filters.end_date } : {}) } } : {}),
     };
     const [data, total] = await prisma.$transaction([
-      prisma.orders.findMany({ where, skip: (filters.page - 1) * filters.limit, take: filters.limit, orderBy: { created_at: "desc" }, select: { id: true, public_id: true, order_number: true, subtotal: true, discount: true, service_fee: true, tax: true, total: true, status: true, created_at: true, user: { select: { id: true, email: true, userProfiles: { select: { full_name: true } } } }, payments: { select: { public_id: true, payment_method: true, provider: true, transaction_id: true, gross_amount: true, status: true, paid_at: true } } } }),
+      prisma.orders.findMany({ where, skip: (filters.page - 1) * filters.limit, take: filters.limit, orderBy: { created_at: "desc" }, select: { id: true, public_id: true, order_number: true, subtotal: true, discount: true, service_fee: true, tax: true, total: true, status: true, created_at: true, user: { select: { id: true, email: true, userProfiles: { select: { full_name: true } } } }, payments: { select: { public_id: true, payment_method: true, provider: true, provider_transaction_id: true, gross_amount: true, status: true, paid_at: true } } } }),
       prisma.orders.count({ where }),
     ]);
     return { data, total };

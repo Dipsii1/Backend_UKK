@@ -9,6 +9,9 @@ import { OrganizerService } from "../src/modules/organizer/organizer.service.js"
 import { ConflictError } from "../src/utils/app-error.js";
 import { AdminService } from "../src/modules/admin/admin.service.js";
 import { CartService, cartRules } from "../src/modules/cart/cart.service.js";
+import { PaymentService, mapMidtransStatus, paymentRules } from "../src/modules/payment/payment.service.js";
+import { midtrans } from "../src/utils/midtrans.js";
+import { env } from "../src/config/env.js";
 
 vi.mock("../src/utils/mailer.js", () => ({ sendMail: vi.fn().mockResolvedValue(undefined) }));
 
@@ -411,5 +414,134 @@ describe("Hardening", () => {
     const service = new AuthService(repository as never);
     await expect(service.refresh(accessToken)).rejects.toBeInstanceOf(UnauthorizedError);
     expect(repository.findRefreshToken).not.toHaveBeenCalled();
+  });
+});
+
+describe("PaymentService", () => {
+  const order = { id: 9n, order_number: "ORD-9", total: 116550, status: "pending", expired_at: new Date(Date.now() + 10 * 60_000) };
+  const pendingPayment = { id: 3n, order_id: 9n, public_id: "pay-1", gross_amount: 116550, status: "pending", snap_token: null, redirect_url: null };
+  const notification = {
+    order_id: "ORD-9",
+    status_code: "200",
+    gross_amount: "116550.00",
+    signature_key: "a".repeat(128),
+    transaction_status: "settlement",
+    transaction_id: "mid-1",
+  };
+  const gateway = (overrides = {}) => ({
+    createSnapTransaction: vi.fn().mockResolvedValue({ token: "snap-1", redirect_url: "https://snap/1" }),
+    isValidSignature: vi.fn().mockReturnValue(true),
+    ...overrides,
+  });
+
+  it("sends the server-side order total and stored order number to Snap", async () => {
+    const now = new Date();
+    const repository = {
+      reserve: vi.fn().mockResolvedValue({ reason: "created", order, payment: pendingPayment, now }),
+      saveSnap: vi.fn().mockResolvedValue({ ...pendingPayment, snap_token: "snap-1", redirect_url: "https://snap/1" }),
+    };
+    const snap = gateway();
+    const service = new PaymentService(repository as never, snap);
+
+    await expect(service.createTransaction(1n, 9n)).resolves.toMatchObject({ created: true, data: { snap_token: "snap-1", gross_amount: 116550 } });
+    expect(repository.reserve).toHaveBeenCalledWith(9n, 1n);
+    expect(snap.createSnapTransaction).toHaveBeenCalledWith({ orderId: "ORD-9", grossAmount: 116550, expiresAt: order.expired_at, now });
+  });
+
+  it("returns the existing Snap token instead of creating a duplicate transaction", async () => {
+    const repository = { reserve: vi.fn().mockResolvedValue({ reason: "exists", order, payment: { ...pendingPayment, snap_token: "snap-1" }, now: new Date() }) };
+    const snap = gateway();
+    const service = new PaymentService(repository as never, snap);
+
+    await expect(service.createTransaction(1n, 9n)).resolves.toMatchObject({ created: false, data: { snap_token: "snap-1" } });
+    expect(snap.createSnapTransaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects payment for orders that are not owned or not payable", async () => {
+    const notFound = new PaymentService({ reserve: vi.fn().mockResolvedValue({ reason: "not_found" }) } as never, gateway());
+    const notPayable = new PaymentService({ reserve: vi.fn().mockResolvedValue({ reason: "not_payable" }) } as never, gateway());
+
+    await expect(notFound.createTransaction(1n, 9n)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(notPayable.createTransaction(1n, 9n)).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("releases the payment slot when Midtrans fails", async () => {
+    const repository = {
+      reserve: vi.fn().mockResolvedValue({ reason: "created", order, payment: pendingPayment, now: new Date() }),
+      deletePayment: vi.fn().mockResolvedValue(undefined),
+      saveSnap: vi.fn(),
+    };
+    const service = new PaymentService(repository as never, gateway({ createSnapTransaction: vi.fn().mockRejectedValue(new Error("gateway down")) }));
+
+    await expect(service.createTransaction(1n, 9n)).rejects.toThrow("gateway down");
+    expect(repository.deletePayment).toHaveBeenCalledWith(3n);
+    expect(repository.saveSnap).not.toHaveBeenCalled();
+  });
+
+  it("rejects notifications with an invalid signature before touching the database", async () => {
+    const repository = { findByOrderNumber: vi.fn() };
+    const service = new PaymentService(repository as never, gateway({ isValidSignature: vi.fn().mockReturnValue(false) }));
+
+    await expect(service.handleNotification(notification)).rejects.toBeInstanceOf(ForbiddenError);
+    expect(repository.findByOrderNumber).not.toHaveBeenCalled();
+  });
+
+  it("logs but does not apply a notification whose gross_amount differs from the stored payment", async () => {
+    const repository = {
+      findByOrderNumber: vi.fn().mockResolvedValue(pendingPayment),
+      logNotification: vi.fn().mockResolvedValue(undefined),
+      applyNotification: vi.fn(),
+    };
+    const service = new PaymentService(repository as never, gateway());
+
+    await expect(service.handleNotification({ ...notification, gross_amount: "1000.00" })).rejects.toMatchObject({ statusCode: 400 });
+    expect(repository.logNotification).toHaveBeenCalled();
+    expect(repository.applyNotification).not.toHaveBeenCalled();
+  });
+
+  it("applies a verified settlement as PAID", async () => {
+    const repository = {
+      findByOrderNumber: vi.fn().mockResolvedValue(pendingPayment),
+      applyNotification: vi.fn().mockResolvedValue("applied"),
+    };
+    const service = new PaymentService(repository as never, gateway());
+
+    await expect(service.handleNotification(notification)).resolves.toEqual({ result: "applied" });
+    expect(repository.applyNotification).toHaveBeenCalledWith(pendingPayment, notification, { payment: "settlement", order: "paid" });
+  });
+
+  it("verifies signature_key as SHA512(order_id + status_code + gross_amount + ServerKey)", () => {
+    const original = env.MIDTRANS_SERVER_KEY;
+    env.MIDTRANS_SERVER_KEY = "SB-Mid-server-test";
+    const signature = crypto.createHash("sha512").update("ORD-9" + "200" + "116550.00" + "SB-Mid-server-test").digest("hex");
+
+    expect(midtrans.isValidSignature("ORD-9", "200", "116550.00", signature)).toBe(true);
+    expect(midtrans.isValidSignature("ORD-9", "200", "1.00", signature)).toBe(false);
+    env.MIDTRANS_SERVER_KEY = original;
+  });
+
+  it("maps Midtrans statuses to payment and order statuses", () => {
+    const map = (transaction_status: string, extra = {}) => mapMidtransStatus({ ...notification, transaction_status, ...extra });
+
+    expect(map("capture", { fraud_status: "accept" })).toEqual({ payment: "settlement", order: "paid" });
+    expect(map("capture", { fraud_status: "challenge" })).toEqual({ payment: "pending", order: "pending" });
+    expect(map("settlement", { status_code: "201" })).toBeNull();
+    expect(map("pending", { status_code: "201" })).toEqual({ payment: "pending", order: "pending" });
+    expect(map("deny", { status_code: "202" })).toEqual({ payment: "failed", order: "cancelled" });
+    expect(map("cancel", { status_code: "202" })).toEqual({ payment: "cancelled", order: "cancelled" });
+    expect(map("expire", { status_code: "202" })).toEqual({ payment: "expired", order: "expired" });
+    expect(map("refund")).toEqual({ payment: "refunded", order: "refunded" });
+    expect(map("partial_refund")).toBeNull();
+  });
+
+  it("only allows forward payment transitions and payable pending orders", () => {
+    const now = new Date();
+    expect(paymentRules.canTransition("pending", "settlement")).toBe(true);
+    expect(paymentRules.canTransition("settlement", "refunded")).toBe(true);
+    expect(paymentRules.canTransition("settlement", "expired")).toBe(false);
+    expect(paymentRules.canTransition("expired", "settlement")).toBe(false);
+    expect(paymentRules.isPayable({ ...order, expired_at: new Date(now.getTime() + 30_000) }, now)).toBe(false);
+    expect(paymentRules.isPayable({ ...order, status: "paid" }, now)).toBe(false);
+    expect(paymentRules.grossAmount({ ...order, total: 1000.5 })).toBe(1001);
   });
 });

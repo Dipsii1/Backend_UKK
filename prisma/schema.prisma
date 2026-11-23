@@ -58,6 +58,7 @@ enum PaymentStatus {
   settlement
   expired
   failed
+  cancelled
   refunded
 }
 
@@ -763,9 +764,11 @@ model payments {
 
   order_id BigInt
 
-  payment_method String?
-  provider       String?
-  transaction_id String?
+  payment_method          String?
+  provider                String?
+  provider_transaction_id String? @unique
+  snap_token              String?
+  redirect_url            String?
 
   gross_amount Decimal       @db.Decimal(12, 2)
   status       PaymentStatus @default(pending)

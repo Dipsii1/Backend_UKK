@@ -257,6 +257,15 @@ describe("HTTP routes", () => {
     const response = await request(app).get("/api/v1/cart").set("Authorization", `Bearer ${tokenFor(2n)}`);
     expect(response.status).toBe(403);
   });
+  it("restricts Midtrans payment creation to buyers and rejects malformed webhooks", async () => {
+    prismaMock.users.findUnique.mockResolvedValueOnce(admin);
+    const forbidden = await request(app).post("/api/v1/payments/1").set("Authorization", `Bearer ${tokenFor(2n)}`);
+    const anonymous = await request(app).post("/api/v1/payments/1");
+    const malformed = await request(app).post("/api/v1/payments/midtrans/webhook").send({ order_id: "ORD-1", gross_amount: 1000 });
+
+    expect([forbidden.status, anonymous.status, malformed.status]).toEqual([403, 401, 400]);
+  });
+
   it("reports health with database status", async () => {
     prismaMock.$queryRaw.mockResolvedValueOnce([{ "?column?": 1 }]);
     const up = await request(app).get("/api/v1/health");

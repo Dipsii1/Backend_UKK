@@ -71,6 +71,10 @@ SMTP_FROM="Tixo <email@gmail.com>"
 
 # Reverse proxy (true hanya jika di belakang proxy/load balancer)
 TRUST_PROXY=false
+
+# Midtrans Snap (Sandbox)
+MIDTRANS_SERVER_KEY=SB-Mid-server-xxxxxxxx
+MIDTRANS_IS_PRODUCTION=false
 ```
 
 | Variabel | Keterangan |
@@ -85,6 +89,8 @@ TRUST_PROXY=false
 | `CORS_ORIGIN` | Origin frontend yang diizinkan mengirim cookie |
 | `SMTP_*` | Konfigurasi pengiriman email (`SMTP_SECURE=true` untuk port 465) |
 | `TRUST_PROXY` | Percayai `X-Forwarded-For` dari satu proxy (untuk rate limit per IP) |
+| `MIDTRANS_SERVER_KEY` | Server Key Midtrans (Snap API + verifikasi `signature_key` webhook). Tanpa ini endpoint pembayaran merespons `503` |
+| `MIDTRANS_IS_PRODUCTION` | `false` = Sandbox (`app.sandbox.midtrans.com`), `true` = Production |
 
 ## 🚀 Menjalankan
 
@@ -206,6 +212,17 @@ Semua endpoint cart memerlukan JWT dengan role `buyer`. Item keranjang menahan k
 | `DELETE` | `/api/v1/cart/items/:ticketTypeId` | Hapus item dan lepaskan reservasi tiket |
 | `POST` | `/api/v1/cart/checkout` | Buat order pending dan kalkulasi voucher, admin fee, pajak, serta total |
 
+### Payments
+
+| Method | Endpoint | Keterangan |
+|--------|----------|------------|
+| `POST` | `/api/v1/payments/:orderId` | (buyer, pemilik order) Buat transaksi Midtrans Snap dari order `pending`. Tanpa body: `gross_amount` dihitung server dari total order. Mengembalikan `snap_token` dan `redirect_url`; bila transaksi pending sudah ada, token yang sama dikembalikan (`200`) |
+| `POST` | `/api/v1/payments/midtrans/webhook` | (publik, dipanggil Midtrans) HTTP notification. Diverifikasi dengan `signature_key` = SHA512(`order_id`+`status_code`+`gross_amount`+ServerKey) dan `gross_amount` harus sama dengan transaksi tersimpan |
+
+Atur **Payment Notification URL** di Dashboard Midtrans Sandbox ke `https://<host>/api/v1/payments/midtrans/webhook`.
+
+Pemetaan status: `settlement` / `capture` (fraud `accept`) → payment `settlement`, order `paid`, e-ticket terbit; `pending` → tetap pending; `deny`/`failure` → payment `failed`, order `cancelled`; `cancel` → payment `cancelled`, order `cancelled`; `expire` → `expired`; `refund` → `refunded` (tiket `issued` dibatalkan). Order batal/kadaluarsa melepas stok dan voucher. Settlement yang datang setelah order kadaluarsa tidak menerbitkan tiket dan dicatat di audit log (`needs_refund`).
+
 ### Admin
 
 Semua endpoint berikut memerlukan JWT dengan role `admin`. Perubahan status dan approval dicatat pada `audit_logs`.
@@ -256,6 +273,14 @@ npm run test:coverage
 Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock Prisma; test HTTP memock singleton Prisma sehingga tidak membutuhkan database atau layanan eksternal. Helper `tests/helpers/prisma.mock.ts` tersedia untuk test repository/unit yang membutuhkan Prisma mock dengan reset otomatis.
 
 ## 📝 Changelog
+
+### 2026-11-23 — Pembayaran Midtrans Snap (Sandbox)
+- Module baru `payment`: `POST /api/v1/payments/:orderId` membuat transaksi Snap dari order `pending` milik buyer. `order_id` = `order_number`, `gross_amount` dihitung server (total order dibulatkan ke rupiah), dan expiry Snap disamakan dengan `expired_at` order. Baris order di-lock agar tidak ada transaksi ganda; bila Midtrans gagal, slot payment dihapus agar bisa dicoba lagi.
+- `POST /api/v1/payments/midtrans/webhook`: verifikasi `signature_key` (timing-safe), cocokkan `gross_amount`, simpan setiap notifikasi ke `payment_logs`, lalu perbarui payment + order + stok + tiket dalam satu transaksi `Serializable`. Transisi status hanya maju (pending → final, settlement → refunded), jadi notifikasi duplikat tidak mengubah apa pun.
+- E-ticket (`tickets`) diterbitkan hanya saat pembayaran terverifikasi (settlement / capture accept).
+- Migrasi `20261123090000_add_midtrans_payment`: enum `PaymentStatus` + `cancelled`, kolom `snap_token`, `redirect_url`, dan `transaction_id` diganti nama menjadi `provider_transaction_id` (unik).
+- `CartRepository`: helper `runSerializable`, `lockTicketType`, dan `releasePendingOrder` diekspor untuk dipakai ulang oleh module payment (perilaku cart tidak berubah).
+- Env baru `MIDTRANS_SERVER_KEY`, `MIDTRANS_IS_PRODUCTION`; Swagger tag Payments; folder Payments di Postman.
 
 ### 2026-11-23 — Health check
 - Endpoint publik `GET /api/v1/health` (module `health`) untuk uptime monitor / load balancer: mengecek koneksi database dengan `SELECT 1`, mengembalikan `200` bila normal dan `503` bila database tidak terjangkau. Detail error database tidak dibocorkan.

@@ -7,6 +7,7 @@ import { organizerPaths } from "./swagger/organizer.paths.js";
 import { adminPaths } from "./swagger/admin.paths.js";
 import { cartPaths } from "./swagger/cart.paths.js";
 import { healthPaths } from "./swagger/health.paths.js";
+import { paymentPaths } from "./swagger/payment.paths.js";
 
 const swaggerDocument = {
   openapi: "3.0.0",
@@ -20,8 +21,9 @@ const swaggerDocument = {
     { name: "Organizer", description: "Festival, tiket, kuota, dan monitoring penjualan organizer" },
     { name: "Admin", description: "Approval event, manajemen pengguna dan organizer, serta monitoring sistem" },
     { name: "Cart", description: "Keranjang sementara, reservasi tiket, dan checkout" },
+    { name: "Payments", description: "Pembayaran Midtrans Snap dan webhook notifikasi" },
   ],
-  paths: { ...healthPaths, ...authPaths, ...usersPaths, ...eventPaths, ...organizerPaths, ...adminPaths, ...cartPaths },
+  paths: { ...healthPaths, ...authPaths, ...usersPaths, ...eventPaths, ...organizerPaths, ...adminPaths, ...cartPaths, ...paymentPaths },
   components: {
     securitySchemes: {
       bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },

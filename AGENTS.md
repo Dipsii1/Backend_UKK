@@ -67,10 +67,11 @@ Backend_UKK/
     │   ├── event/
     │   ├── organizer/
     │   ├── cart/              # keranjang, ticket lock, checkout
+    │   ├── payment/           # Midtrans Snap: buat transaksi & webhook notifikasi
     │   ├── health/            # GET /api/v1/health (cek koneksi database)
     │   └── admin/             # approval event, manajemen akun, monitoring sistem
     ├── middlewares/           # auth (JWT), role guard, validasi, error handler, rate limit, logger
-    └── utils/                 # response, app-error, validation (parseSchema, paginationSchema), mailer
+    └── utils/                 # response, app-error, validation (parseSchema, paginationSchema), mailer, midtrans
 ```
 
 ### Konvensi Struktur `src/`
@@ -173,6 +174,7 @@ Jalankan dev server dan build sesuai script di `package.json` (jangan asumsikan 
 - **JWT type**: access token memakai klaim `type: "access"`, refresh token `type: "refresh"`; `authenticate` hanya menerima access token dan `refresh` hanya menerima refresh token.
 - **Organizer & event**: operasi tulis organizer mewajibkan status `verified`. Alur event: `draft` → `POST /organizer/event/:id/submit` → `pending_review` → approve → `published`. Event hanya bisa diubah/dihapus/ditambah tiket saat `draft`/`rejected`; harga tiket terkunci setelah diajukan.
 - **Cart**: khusus role `buyer`; `max_purchase` dihitung lintas order `pending`/`paid`; voucher usage dilepas saat order expired; transaksi Serializable di-retry saat P2034.
+- **Pembayaran Midtrans**: `gross_amount` selalu dihitung server dari `orders.total`, jangan pernah dari body request. Satu transaksi Snap pending per order (lock baris order). Webhook wajib lolos verifikasi `signature_key` = SHA512(order_id+status_code+gross_amount+ServerKey) dan kecocokan `gross_amount` sebelum menyentuh status. Perubahan payment/order/stok/tiket dalam satu transaksi `Serializable` dengan urutan lock `ticket_types` → `orders`; transisi status hanya maju agar idempotent. E-ticket hanya terbit saat settlement/capture (fraud `accept`). Server Key hanya dari env `MIDTRANS_SERVER_KEY`.
 - **Error Prisma**: P2002/P2003/P2034 → `409`, P2025 → `404` (dipetakan di `errorHandler`). Route tak dikenal → JSON `404`.
 - **Token one-time**: token reset password dan verifikasi email disimpan sebagai hash, memiliki expiry, dan hanya boleh dikonsumsi sekali secara atomik. Reset password mencabut refresh token aktif pengguna.
 - **Event publik**: endpoint publik hanya boleh mengembalikan event dengan `status = published` dan `is_published = true`.

@@ -11,26 +11,64 @@ const toNumber = (value: unknown): number => {
   return 0;
 };
 
-export class CartRepository {
-  constructor(private readonly rules: CartRules) {}
-
-  // Transaksi Serializable bisa gagal (P2034) saat bentrok; ulangi beberapa kali sebelum menyerah.
-  private async serializable<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
-    for (let attempt = 1; ; attempt += 1) {
-      try {
-        return await prisma.$transaction(fn, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-      } catch (error) {
-        const retryable = error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034";
-        if (!retryable || attempt >= MAX_SERIALIZATION_RETRIES) throw error;
-      }
+// Transaksi Serializable bisa gagal (P2034) saat bentrok; ulangi beberapa kali sebelum menyerah.
+export async function runSerializable<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await prisma.$transaction(fn, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    } catch (error) {
+      const retryable = error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034";
+      if (!retryable || attempt >= MAX_SERIALIZATION_RETRIES) throw error;
     }
   }
+}
 
-  private async lockTicketType(tx: Prisma.TransactionClient, ticketTypeId: bigint): Promise<void> {
-    await tx.$queryRaw(
-      Prisma.sql`SELECT "id" FROM "ticket_types" WHERE "id" = ${ticketTypeId} FOR UPDATE`,
-    );
+export async function lockTicketType(tx: Prisma.TransactionClient, ticketTypeId: bigint): Promise<void> {
+  await tx.$queryRaw(
+    Prisma.sql`SELECT "id" FROM "ticket_types" WHERE "id" = ${ticketTypeId} FOR UPDATE`,
+  );
+}
+
+type ReleasableOrder = { id: bigint; user_id: bigint; orderItems: { ticket_type_id: bigint; quantity: number }[] };
+
+// Pindahkan order pending ke status final dan kembalikan stok + voucher. Pemanggil wajib sudah me-lock ticket_types.
+export async function releasePendingOrder(
+  tx: Prisma.TransactionClient,
+  order: ReleasableOrder,
+  status: "expired" | "cancelled",
+  where: Prisma.ordersWhereInput = {},
+): Promise<boolean> {
+  const updated = await tx.orders.updateMany({
+    where: { ...where, id: order.id, status: "pending" },
+    data: { status },
+  });
+  if (updated.count === 0) return false;
+
+  for (const item of order.orderItems) {
+    await tx.ticket_types.update({
+      where: { id: item.ticket_type_id },
+      data: { sold: { decrement: item.quantity } },
+    });
   }
+
+  // Voucher dari order yang batal/kadaluarsa dikembalikan agar bisa dipakai lagi.
+  await tx.voucher_usages.deleteMany({ where: { order_id: order.id } });
+
+  await tx.audit_logs.create({
+    data: {
+      user_id: order.user_id,
+      action: "update",
+      table_name: "orders",
+      record_id: order.id,
+      old_data: { status: "pending" },
+      new_data: { status },
+    },
+  });
+  return true;
+}
+
+export class CartRepository {
+  constructor(private readonly rules: CartRules) {}
 
   private async getOrCreateCart(tx: Prisma.TransactionClient, userId: bigint) {
     return tx.carts.upsert({
@@ -61,37 +99,11 @@ export class CartRepository {
     ].sort((a, b) => Number(a - b));
 
     for (const ticketTypeId of ticketTypeIds) {
-      await this.lockTicketType(tx, ticketTypeId);
+      await lockTicketType(tx, ticketTypeId);
     }
 
     for (const order of expiredOrders) {
-      const updated = await tx.orders.updateMany({
-        where: { id: order.id, status: "pending", expired_at: { lte: now } },
-        data: { status: "expired" },
-      });
-
-      if (updated.count === 0) continue;
-
-      for (const item of order.orderItems) {
-        await tx.ticket_types.update({
-          where: { id: item.ticket_type_id },
-          data: { sold: { decrement: item.quantity } },
-        });
-      }
-
-      // Voucher dari order yang kadaluarsa dikembalikan agar bisa dipakai lagi.
-      await tx.voucher_usages.deleteMany({ where: { order_id: order.id } });
-
-      await tx.audit_logs.create({
-        data: {
-          user_id: order.user_id,
-          action: "update",
-          table_name: "orders",
-          record_id: order.id,
-          old_data: { status: "pending" },
-          new_data: { status: "expired" },
-        },
-      });
+      await releasePendingOrder(tx, order, "expired", { expired_at: { lte: now } });
     }
   }
 
@@ -131,11 +143,11 @@ export class CartRepository {
   }
 
   async upsertItem(userId: bigint, ticketTypeId: bigint, quantity: number) {
-    return this.serializable(async (tx) => {
+    return runSerializable(async (tx) => {
       const now = new Date();
       await this.expirePendingOrders(tx, now);
       await tx.ticket_locks.deleteMany({ where: { expires_at: { lte: now } } });
-      await this.lockTicketType(tx, ticketTypeId);
+      await lockTicketType(tx, ticketTypeId);
 
       const ticket = await tx.ticket_types.findUnique({
         where: { id: ticketTypeId },
@@ -214,7 +226,7 @@ export class CartRepository {
   }
 
   async checkout(userId: bigint, voucherCode?: string) {
-    return this.serializable(async (tx) => {
+    return runSerializable(async (tx) => {
       const now = new Date();
       await this.expirePendingOrders(tx, now);
       await tx.ticket_locks.deleteMany({ where: { expires_at: { lte: now } } });
@@ -240,7 +252,7 @@ export class CartRepository {
       const items = [...cart.items].sort((a, b) => Number(a.ticket_type_id - b.ticket_type_id));
 
       for (const item of items) {
-        await this.lockTicketType(tx, item.ticket_type_id);
+        await lockTicketType(tx, item.ticket_type_id);
 
         const lock = activeLocks.get(item.ticket_type_id.toString());
         if (!lock || lock.quantity !== item.quantity) {

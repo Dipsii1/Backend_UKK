@@ -23,6 +23,9 @@ const schema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().optional(),
+  // Server Key Midtrans: untuk Basic Auth Snap API dan verifikasi signature_key webhook. Jangan pernah dikirim ke frontend.
+  MIDTRANS_SERVER_KEY: z.string().min(1).optional(),
+  MIDTRANS_IS_PRODUCTION: boolFromString,
 });
 
 const parsed = schema.safeParse(process.env);
