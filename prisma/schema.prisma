@@ -179,6 +179,7 @@ model users {
   checkedInTickets   tickets[]             @relation("ticketCheckedInBy")
   ticketScans        ticket_scans[]
   notifications      notifications[]
+  pushTokens         push_tokens[]
   auditLogs          audit_logs[]
   activityLogs       activity_logs[]
   approvedEvents     events[]              @relation("approvedBy")
@@ -899,6 +900,21 @@ model notifications {
 
   @@index([user_id])
   @@index([is_read])
+}
+
+// Expo push token per perangkat mobile; satu token hanya milik satu user (perangkat bisa ganti akun).
+model push_tokens {
+  id BigInt @id @default(autoincrement())
+
+  user_id BigInt
+  token   String @unique
+
+  created_at DateTime  @default(now())
+  updated_at DateTime? @updatedAt
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
 }
 
 model banners {

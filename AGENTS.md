@@ -61,6 +61,7 @@ Backend_UKK/
     ├── generated/prisma/      # Prisma Client (generated — jangan edit)
     ├── config/                # env, swagger config (swagger/*.paths.ts)
     ├── lib/prisma.ts          # instance Prisma (satu-satunya)
+    ├── lib/socket.ts          # instance Socket.IO (auth handshake, emitToUser/Role/All)
     ├── modules/               # domain module (route, controller, service, repository, validation, types)
     │   ├── auth/
     │   ├── user/
@@ -71,6 +72,7 @@ Backend_UKK/
     │   ├── ticket/            # e-ticket buyer (GET /me/tickets) + QR
     │   ├── check-in/          # scan & validasi QR e-ticket
     │   ├── health/            # GET /api/v1/health (cek koneksi database)
+    │   ├── notification/      # notifikasi user, Expo push token, broadcast admin
     │   └── admin/             # approval event, manajemen akun, monitoring sistem
     ├── middlewares/           # auth (JWT), role guard, validasi, error handler, rate limit, logger
     └── utils/                 # response, app-error, validation (parseSchema, paginationSchema), mailer, midtrans
@@ -181,6 +183,7 @@ Jalankan dev server dan build sesuai script di `package.json` (jangan asumsikan 
 - **Pembayaran Midtrans**: `gross_amount` selalu dihitung server dari `orders.total`, jangan pernah dari body request. Satu transaksi Snap pending per order (lock baris order). Webhook wajib lolos verifikasi `signature_key` = SHA512(order_id+status_code+gross_amount+ServerKey) dan kecocokan `gross_amount` sebelum menyentuh status. Perubahan payment/order/stok/tiket dalam satu transaksi `Serializable` dengan urutan lock `ticket_types` → `orders`; transisi status hanya maju agar idempotent. E-ticket hanya terbit saat settlement/capture (fraud `accept`). Server Key hanya dari env `MIDTRANS_SERVER_KEY`.
 - **Error Prisma**: P2002/P2003/P2034 → `409`, P2025 → `404` (dipetakan di `errorHandler`). Route tak dikenal → JSON `404`.
 - **Token one-time**: token reset password dan verifikasi email disimpan sebagai hash, memiliki expiry, dan hanya boleh dikonsumsi sekali secara atomik. Reset password mencabut refresh token aktif pengguna.
+- **Notifikasi & realtime**: push memakai Expo Push (`utils/expo-push.ts`), realtime memakai Socket.IO (`lib/socket.ts`). Handshake socket wajib access token (`verifyAccessToken`) dan user aktif + email terverifikasi; client masuk room `user:<id>` dan `role:<name>`. Emit dilakukan **setelah** transaksi commit; payload tidak boleh berisi PII/token. `order:updated` hanya ke pemilik order. Broadcast hanya admin, wajib tercatat di audit log. Kegagalan push tidak boleh membatalkan notifikasi tersimpan; jangan log push token.
 - **Event publik**: endpoint publik hanya boleh mengembalikan event dengan `status = published` dan `is_published = true`.
 
 ---

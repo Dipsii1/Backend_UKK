@@ -26,6 +26,8 @@ const schema = z.object({
   // Server Key Midtrans: untuk Basic Auth Snap API dan verifikasi signature_key webhook. Jangan pernah dikirim ke frontend.
   MIDTRANS_SERVER_KEY: z.string().min(1).optional(),
   MIDTRANS_IS_PRODUCTION: boolFromString,
+  // Opsional: aktifkan bila "Enhanced Push Security" Expo dinyalakan.
+  EXPO_ACCESS_TOKEN: z.string().min(1).optional(),
 });
 
 const parsed = schema.safeParse(process.env);

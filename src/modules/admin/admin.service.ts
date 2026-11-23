@@ -1,6 +1,7 @@
 import type { OrganizerStatus } from "../../generated/prisma/client.js";
 import { ConflictError, NotFoundError, ValidationError } from "../../utils/app-error.js";
 import { AdminRepository } from "./admin.repository.js";
+import { emitToAll } from "../../lib/socket.js";
 import type { OrganizerQuery, TransactionLogQuery, UserQuery } from "./admin.types.js";
 
 export class AdminService {
@@ -15,6 +16,8 @@ export class AdminService {
     if (!result.event) {
       throw new ConflictError("Organizer event belum terverifikasi");
     }
+    // Client yang terhubung me-refresh daftar event tanpa restart aplikasi.
+    emitToAll("event:published", { id: result.event.id, public_id: result.event.public_id, title: result.event.title });
     return result.event;
   }
 

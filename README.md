@@ -91,6 +91,7 @@ MIDTRANS_IS_PRODUCTION=false
 | `TRUST_PROXY` | Percayai `X-Forwarded-For` dari satu proxy (untuk rate limit per IP) |
 | `MIDTRANS_SERVER_KEY` | Server Key Midtrans (Snap API + verifikasi `signature_key` webhook). Tanpa ini endpoint pembayaran merespons `503` |
 | `MIDTRANS_IS_PRODUCTION` | `false` = Sandbox (`app.sandbox.midtrans.com`), `true` = Production |
+| `EXPO_ACCESS_TOKEN` | Opsional. Isi hanya bila *Enhanced Push Security* Expo aktif |
 
 ## 🚀 Menjalankan
 
@@ -270,6 +271,36 @@ Semua endpoint berikut memerlukan JWT dengan role `admin`. Perubahan status dan 
 | `GET` | `/api/v1/admin/dashboard` | Ringkasan user, organizer, event, pending approval, order paid, pendapatan, dan order terbaru |
 | `GET` | `/api/v1/admin/transaction-logs` | Log order/pembayaran dengan pagination dan filter status/rentang tanggal |
 
+### Notifikasi, Push & Realtime
+
+Push notification memakai **Expo Push Service**; realtime memakai **Socket.IO** di port/server yang sama dengan API.
+
+| Method | Path | Keterangan |
+|:------:|------|------------|
+| `GET` | `/api/v1/notifications` | Notifikasi milik user login (pagination) + jumlah `unread` |
+| `PATCH` | `/api/v1/notifications/:id/read` | Tandai notifikasi sendiri sudah dibaca |
+| `POST` | `/api/v1/notifications/push-tokens` | Daftarkan Expo push token perangkat `{ "token": "ExponentPushToken[...]" }` (panggil setelah login) |
+| `DELETE` | `/api/v1/notifications/push-tokens` | Hapus token perangkat (panggil saat logout) |
+| `POST` | `/api/v1/notifications/broadcast` | **Admin**: kirim `{ title, message?, type?, role: "buyer" \| "organizer" \| "all" }` ke semua user aktif role tersebut. Disimpan ke `notifications`, dikirim via websocket + Expo push, dicatat di `audit_logs`. Response `{ recipients, push_sent }` |
+
+Koneksi websocket dari aplikasi mobile (`socket.io-client`):
+
+```ts
+const socket = io("https://api.example.com", { auth: { token: accessToken } });
+socket.on("notification:new", (n) => { /* tampilkan / refetch notifikasi */ });
+socket.on("order:updated", (o) => { /* { order_number, order_status, payment_status } → refetch order & e-ticket */ });
+socket.on("event:published", (e) => { /* { id, public_id, title } → refresh daftar event */ });
+socket.on("connect_error", () => { /* token invalid/expired: refresh token lalu socket.connect() */ });
+```
+
+| Event | Penerima | Pemicu |
+|-------|----------|--------|
+| `notification:new` | User dengan role target (atau semua) | Broadcast admin |
+| `order:updated` | Pemilik order saja | Webhook Midtrans mengubah status pembayaran/order |
+| `event:published` | Semua client terhubung | Admin approve event |
+
+Token push yang dilaporkan Expo sebagai `DeviceNotRegistered` otomatis dihapus. Gagal push tidak membatalkan notifikasi yang sudah tersimpan.
+
 ## 📨 Format Response
 
 **Sukses**
@@ -306,6 +337,15 @@ npm run test:coverage
 Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock Prisma; test HTTP memock singleton Prisma sehingga tidak membutuhkan database atau layanan eksternal. Helper `tests/helpers/prisma.mock.ts` tersedia untuk test repository/unit yang membutuhkan Prisma mock dengan reset otomatis.
 
 ## 📝 Changelog
+
+### 2026-11-26 — Push notification & realtime websocket
+- Module baru `notification`: daftar & tandai baca notifikasi, registrasi Expo push token, dan broadcast admin per role (`buyer`/`organizer`/`all`).
+- Tabel baru `push_tokens` (migrasi `20261126090000_add_push_tokens`); token unik per perangkat, pindah ke user baru bila perangkat ganti akun.
+- Socket.IO (`src/lib/socket.ts`) dengan autentikasi access token saat handshake; room per user dan per role. Event: `notification:new`, `order:updated`, `event:published`.
+- Helper `src/utils/expo-push.ts` (batch 100, hapus token `DeviceNotRegistered`). Env opsional `EXPO_ACCESS_TOKEN`.
+- `verifyAccessToken` diekstrak dari middleware `authenticate` agar dipakai bersama HTTP dan websocket.
+- Pengiriman Expo push memakai timeout 10 detik agar broadcast admin tidak menggantung.
+- Test handshake Socket.IO (`tests/socket.test.ts`): token salah/refresh token/user nonaktif ditolak, user valid terhubung.
 
 ### 2026-11-25 — Harga dalam format Rupiah
 - Helper `formatRupiah` di `src/utils/currency.ts` (`150000` → `"Rp 150.000"`, tanpa sen).

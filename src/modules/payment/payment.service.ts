@@ -1,5 +1,6 @@
 import { PaymentRepository } from "./payment.repository.js";
 import { midtrans } from "../../utils/midtrans.js";
+import { emitToUser } from "../../lib/socket.js";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../../utils/app-error.js";
 import type { MidtransNotification, PaymentRules, PaymentStatusValue, PaymentTarget } from "./payment.types.js";
 
@@ -120,7 +121,16 @@ export class PaymentService {
       throw new ValidationError("gross_amount tidak sesuai dengan transaksi");
     }
 
-    const result = await this.paymentRepo.applyNotification(payment, notification, mapMidtransStatus(notification));
+    const target = mapMidtransStatus(notification);
+    const result = await this.paymentRepo.applyNotification(payment, notification, target);
+    // Dikirim setelah transaksi commit agar aplikasi buyer langsung refresh order & e-ticket.
+    if (result === "applied" && target) {
+      emitToUser(payment.order.user_id, "order:updated", {
+        order_number: order_id,
+        order_status: target.order,
+        payment_status: target.payment,
+      });
+    }
     return { result };
   }
 }

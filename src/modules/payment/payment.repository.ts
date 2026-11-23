@@ -47,6 +47,7 @@ export class PaymentRepository {
     return prisma.payments.findFirst({
       where: { provider: "midtrans", order: { order_number: orderNumber } },
       orderBy: { created_at: "desc" },
+      include: { order: { select: { user_id: true } } },
     });
   }
 

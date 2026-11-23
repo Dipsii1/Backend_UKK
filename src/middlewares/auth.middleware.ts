@@ -13,6 +13,16 @@ declare global {
   }
 }
 
+// Melempar error bila token bukan access token valid; dipakai juga oleh handshake Socket.IO.
+export const verifyAccessToken = (token: string): bigint => {
+  const payload = jwt.verify(token, env.JWT_SECRET, { algorithms: ["HS256"] });
+  // type wajib "access": refresh token (secret sama) tidak boleh dipakai sebagai access token.
+  if (typeof payload !== "object" || payload === null || payload.type !== "access" || typeof payload.sub !== "string" || !/^[1-9]\d*$/.test(payload.sub)) {
+    throw new Error("Invalid JWT subject");
+  }
+  return BigInt(payload.sub);
+};
+
 export const authenticate = async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
   const token = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1];
   if (!token) {
@@ -22,12 +32,7 @@ export const authenticate = async (req: Request, _res: Response, next: NextFunct
 
   let userId: bigint;
   try {
-    const payload = jwt.verify(token, env.JWT_SECRET, { algorithms: ["HS256"] });
-    // type wajib "access": refresh token (secret sama) tidak boleh dipakai sebagai access token.
-    if (typeof payload !== "object" || payload === null || payload.type !== "access" || typeof payload.sub !== "string" || !/^[1-9]\d*$/.test(payload.sub)) {
-      throw new Error("Invalid JWT subject");
-    }
-    userId = BigInt(payload.sub);
+    userId = verifyAccessToken(token);
   } catch {
     next(new UnauthorizedError("Token tidak valid atau sudah kadaluarsa"));
     return;

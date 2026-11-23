@@ -19,6 +19,8 @@ import healthRouter from "./modules/health/health.route.js";
 import paymentRouter from "./modules/payment/payment.route.js";
 import ticketRouter from "./modules/ticket/ticket.route.js";
 import checkInRouter from "./modules/check-in/check-in.route.js";
+import notificationRouter from "./modules/notification/notification.route.js";
+import { initSocket } from "./lib/socket.js";
 
 const app = express();
 
@@ -43,6 +45,7 @@ app.use("/api/v1/cart", cartRouter);
 app.use("/api/v1/payments", paymentRouter);
 app.use("/api/v1/me/tickets", ticketRouter);
 app.use("/api/v1/check-in", checkInRouter);
+app.use("/api/v1/notifications", notificationRouter);
 
 setupSwagger(app);
 app.use(notFoundHandler);
@@ -54,8 +57,9 @@ export { app, prisma };
 const isEntryPoint = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isEntryPoint) {
   prisma.$connect().then(() => {
-    app.listen(env.PORT, () => {
+    const server = app.listen(env.PORT, () => {
       console.log(`Server running at http://localhost:${env.PORT}`);
     });
+    initSocket(server);
   });
 }

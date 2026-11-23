@@ -471,7 +471,7 @@ describe("Hardening", () => {
 
 describe("PaymentService", () => {
   const order = { id: 9n, order_number: "ORD-9", total: 116550, status: "pending", expired_at: new Date(Date.now() + 10 * 60_000) };
-  const pendingPayment = { id: 3n, order_id: 9n, public_id: "pay-1", gross_amount: 116550, status: "pending", snap_token: null, redirect_url: null };
+  const pendingPayment = { id: 3n, order_id: 9n, order: { user_id: 1n }, public_id: "pay-1", gross_amount: 116550, status: "pending", snap_token: null, redirect_url: null };
   const notification = {
     order_id: "ORD-9",
     status_code: "200",

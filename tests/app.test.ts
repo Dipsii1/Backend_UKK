@@ -252,6 +252,18 @@ describe("HTTP routes", () => {
     expect(response.status).toBe(409);
   });
 
+  it("restricts notification broadcast to admins and validates Expo push tokens", async () => {
+    prismaMock.users.findUnique.mockResolvedValueOnce(buyer);
+    const forbidden = await request(app).post("/api/v1/notifications/broadcast").set("Authorization", `Bearer ${tokenFor(1n)}`).send({ title: "Promo", role: "buyer" });
+    prismaMock.users.findUnique.mockResolvedValueOnce(buyer);
+    const invalidToken = await request(app).post("/api/v1/notifications/push-tokens").set("Authorization", `Bearer ${tokenFor(1n)}`).send({ token: "not-an-expo-token" });
+    const anonymous = await request(app).get("/api/v1/notifications");
+
+    expect(forbidden.status).toBe(403);
+    expect(invalidToken.status).toBe(400);
+    expect(anonymous.status).toBe(401);
+  });
+
   it("restricts the cart to buyers", async () => {
     prismaMock.users.findUnique.mockResolvedValueOnce(admin);
     const response = await request(app).get("/api/v1/cart").set("Authorization", `Bearer ${tokenFor(2n)}`);
