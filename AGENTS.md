@@ -196,7 +196,7 @@ Testing menggunakan **Vitest** + `@vitest/coverage-v8`, **Supertest** untuk endp
 - Setiap perubahan behavior pada Service sebaiknya disertai test (Red → Green → Refactor).
 - Jangan ubah assertion yang sudah ada demi membuat test pass — perbaiki implementasi.
 - Verifikasi minimum sebelum commit: `npx tsc --noEmit`, `npx prisma validate`, `npm test`, dan `npm run test:coverage` lolos.
-- Target coverage minimum untuk controller dan service adalah 80%.
+- Target coverage minimum untuk controller dan service adalah 80% (`coverage.include` di `vitest.config.ts` = `src/modules/**/*.{controller,service}.ts`). Controller baru ditambahkan ke tabel kasus di `tests/controllers.test.ts`.
 
 ---
 

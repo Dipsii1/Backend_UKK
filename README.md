@@ -336,9 +336,12 @@ npm run test:coverage
 
 Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock Prisma; test HTTP memock singleton Prisma sehingga tidak membutuhkan database atau layanan eksternal. Helper `tests/helpers/prisma.mock.ts` tersedia untuk test repository/unit yang membutuhkan Prisma mock dengan reset otomatis.
 
+`npm run test:coverage` mengukur `src/modules/**/*.{controller,service}.ts` dengan threshold minimal 80% untuk lines, functions, statements, dan branches. Controller diuji lewat route asli (`tests/controllers.test.ts`) dengan service di-mock; aturan bisnis service di `tests/service-rules.test.ts`.
+
 ## 📝 Changelog
 
 ### 2026-11-26 — Perbaikan hasil audit
+- Konfigurasi coverage kini menunjuk ke `src/modules/**/*.{controller,service}.ts` (sebelumnya folder lama yang sudah tidak ada, sehingga coverage selalu 0/0). Ditambah test controller via HTTP dan test aturan bisnis organizer/admin/cart/notification; coverage kini ~96% statements, ~92% branches.
 - Filter `?date=YYYY-MM-DD` di daftar event publik kini dibaca sebagai hari kalender WIB (UTC+7). Sebelumnya UTC, sehingga event antara 00:00–06:59 WIB muncul di tanggal sebelumnya.
 - Saat email user diganti (`PUT /users/:id`), email verifikasi otomatis dikirim ke alamat baru. Status `email_verified` direset dan refresh token dicabut, sehingga user harus memverifikasi alamat baru sebelum bisa memakai API lagi.
 - Error 500 tak terduga kini selalu dicatat ke log, termasuk di production. Stack trace tetap hanya dikirim ke client saat development.

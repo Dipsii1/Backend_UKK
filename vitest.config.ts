@@ -12,7 +12,7 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json", "html"],
       reportsDirectory: "coverage",
-      include: ["src/controllers/**/*.ts", "src/services/**/*.ts"],
+      include: ["src/modules/**/*.{controller,service}.ts"],
       exclude: ["src/**/*.{test,spec}.ts"],
       thresholds: {
         lines: 80,
