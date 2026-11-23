@@ -6,7 +6,7 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:3000/api/v1" },
+    { "key": "baseUrl", "value": "http://localhost:5000/api/v1" },
     { "key": "accessToken", "value": "" },
     { "key": "userId", "value": "1" },
     { "key": "eventId", "value": "1" },
@@ -16,7 +16,9 @@
     { "key": "organizerId", "value": "1" },
     { "key": "verificationToken", "value": "" },
     { "key": "resetToken", "value": "" },
-    { "key": "refreshToken", "value": "" }
+    { "key": "refreshToken", "value": "" },
+    { "key": "notificationId", "value": "1" },
+    { "key": "pushToken", "value": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]" }
   ],
   "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
   "item": [
@@ -84,6 +86,16 @@
       ]
     },
     {
+      "name": "Cart (Buyer)",
+      "description": "Khusus buyer. PUT item mengatur jumlah (bukan menambah) dan membuat reservasi tiket 15 menit. Checkout membuat order pending; lanjutkan ke Payments dengan orderId dari response.",
+      "item": [
+        {"name": "Get My Cart", "request": {"method": "GET", "url": "{{baseUrl}}/cart"}},
+        {"name": "Set Cart Item (Reserve Ticket)", "request": {"method": "PUT", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"ticket_type_id\": \"{{ticketId}}\",\n  \"quantity\": 2\n}"}, "url": "{{baseUrl}}/cart/items"}},
+        {"name": "Remove Cart Item", "request": {"method": "DELETE", "url": "{{baseUrl}}/cart/items/{{ticketId}}"}},
+        {"name": "Checkout", "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"voucher_code\": \"HEMAT10\"\n}"}, "url": "{{baseUrl}}/cart/checkout"}}
+      ]
+    },
+    {
       "name": "Payments",
       "item": [
         { "name": "Create Midtrans Snap Transaction (Buyer)", "request": { "method": "POST", "url": "{{baseUrl}}/payments/{{orderId}}" } },
@@ -96,6 +108,17 @@
         {"name": "My E-Tickets (Buyer)", "request": {"method": "GET", "url": "{{baseUrl}}/me/tickets?page=1&limit=10"}},
         {"name": "My E-Ticket Detail (Buyer)", "request": {"method": "GET", "url": "{{baseUrl}}/me/tickets/{{myTicketId}}"}},
         {"name": "Check-in Scan QR (Organizer/Admin)", "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"event_id\": \"{{eventId}}\",\n  \"qr_token\": \"<isi QR>\"\n}"}, "url": "{{baseUrl}}/check-in"}}
+      ]
+    },
+    {
+      "name": "Notifications",
+      "description": "Realtime: hubungkan Socket.IO ke server (tanpa /api/v1) dengan io(url, { auth: { token: accessToken } }). Event: notification:new, order:updated (pemilik order), event:published (semua client). Push memakai Expo; daftarkan token perangkat setelah login dan hapus saat logout.",
+      "item": [
+        {"name": "My Notifications", "request": {"method": "GET", "url": "{{baseUrl}}/notifications?page=1&limit=10"}},
+        {"name": "Mark Notification Read", "request": {"method": "PATCH", "url": "{{baseUrl}}/notifications/{{notificationId}}/read"}},
+        {"name": "Register Expo Push Token", "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"token\": \"{{pushToken}}\"\n}"}, "url": "{{baseUrl}}/notifications/push-tokens"}},
+        {"name": "Remove Expo Push Token", "request": {"method": "DELETE", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"token\": \"{{pushToken}}\"\n}"}, "url": "{{baseUrl}}/notifications/push-tokens"}},
+        {"name": "Broadcast Notification (Admin)", "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"title\": \"Promo akhir tahun\",\n  \"message\": \"Diskon 50% untuk semua festival\",\n  \"type\": \"system\",\n  \"role\": \"buyer\"\n}"}, "url": "{{baseUrl}}/notifications/broadcast"}}
       ]
     }
   ]

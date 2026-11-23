@@ -353,6 +353,8 @@ Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock 
 - Job tiap 1 menit (di proses server) melepas stok order `pending` yang lewat `expired_at`, sehingga tiket yang tidak dibayar kembali tersedia walau tidak ada aktivitas cart. Memakai transaksi Serializable dan guard status yang sama dengan cart, jadi stok tidak dilepas dua kali.
 
 ### 2026-11-26 — Push notification & realtime websocket
+- Postman collection: folder baru `Cart (Buyer)` (lihat, atur item/reservasi, hapus item, checkout); `baseUrl` dibetulkan ke port default server `5000`.
+- Postman collection: folder baru `Notifications` (daftar, tandai baca, daftar/hapus Expo push token, broadcast admin) dan variabel `notificationId`, `pushToken`.
 - Module baru `notification`: daftar & tandai baca notifikasi, registrasi Expo push token, dan broadcast admin per role (`buyer`/`organizer`/`all`).
 - Tabel baru `push_tokens` (migrasi `20261126090000_add_push_tokens`); token unik per perangkat, pindah ke user baru bila perangkat ganti akun.
 - Socket.IO (`src/lib/socket.ts`) dengan autentikasi access token saat handshake; room per user dan per role. Event: `notification:new`, `order:updated`, `event:published`.
