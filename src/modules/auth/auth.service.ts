@@ -45,6 +45,29 @@ const signRefreshToken = (userId: bigint): string =>
 export class AuthService {
   constructor(private readonly userAuthRepo: UserAuthRepository = new UserAuthRepository()) {}
 
+  // Gagal kirim email tidak menggagalkan alur pemanggil; error sudah tercatat di mailer.
+  private async mailVerification(email: string, token: string) {
+    try {
+      await sendMail({
+        to: email,
+        subject: "Verifikasi Email Tixo",
+        html: verifyEmailTemplate(`${env.CLIENT_URL}/auth/verify-email?token=${token}`),
+      });
+    } catch {
+      // diabaikan, lihat komentar di atas
+    }
+  }
+
+  private async issueVerification(userId: bigint, email: string) {
+    const verifyToken = crypto.randomBytes(32).toString("hex");
+    await this.userAuthRepo.createEmailVerificationToken({
+      userId,
+      token: hashToken(verifyToken),
+      expiredAt: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS),
+    });
+    await this.mailVerification(email, verifyToken);
+  }
+
   async register(input: RegisterInput): Promise<RegisterResult> {
     const existingEmail = await this.userAuthRepo.findByEmail(input.email);
     if (existingEmail) throw new ConflictError("Email sudah terdaftar");
@@ -55,22 +78,7 @@ export class AuthService {
       fullName: input.fullName,
     });
 
-    const verifyToken = crypto.randomBytes(32).toString("hex");
-    await this.userAuthRepo.createEmailVerificationToken({
-      userId: user.id,
-      token: hashToken(verifyToken),
-      expiredAt: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS),
-    });
-
-    try {
-      await sendMail({
-        to: user.email,
-        subject: "Verifikasi Email Tixo",
-        html: verifyEmailTemplate(`${env.CLIENT_URL}/auth/verify-email?token=${verifyToken}`),
-      });
-    } catch {
-      // Error sudah tercatat di mailer; pendaftaran tetap berhasil.
-    }
+    await this.issueVerification(user.id, user.email);
 
     return {
       user: { public_id: user.public_id, email: user.email, full_name: input.fullName },
@@ -94,15 +102,7 @@ export class AuthService {
       verificationExpiresAt: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS),
     });
 
-    try {
-      await sendMail({
-        to: user.email,
-        subject: "Verifikasi Email Tixo",
-        html: verifyEmailTemplate(`${env.CLIENT_URL}/auth/verify-email?token=${verifyToken}`),
-      });
-    } catch {
-      // Error sudah tercatat di mailer; pendaftaran tetap berhasil.
-    }
+    await this.mailVerification(user.email, verifyToken);
 
     return {
       user: { public_id: user.public_id, email: user.email, full_name: input.fullName },
@@ -260,24 +260,7 @@ export class AuthService {
 
   async requestEmailVerification(email: string) {
     const user = await this.userAuthRepo.findByEmail(email);
-    if (user) {
-      const verifyToken = crypto.randomBytes(32).toString("hex");
-      await this.userAuthRepo.createEmailVerificationToken({
-        userId: user.id,
-        token: hashToken(verifyToken),
-        expiredAt: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS),
-      });
-
-      try {
-        await sendMail({
-          to: user.email,
-          subject: "Verifikasi Email Tixo",
-          html: verifyEmailTemplate(`${env.CLIENT_URL}/auth/verify-email?token=${verifyToken}`),
-        });
-      } catch {
-        // Error sudah tercatat di mailer.
-      }
-    }
+    if (user) await this.issueVerification(user.id, user.email);
 
     return { message: "Jika email terdaftar, link verifikasi telah dikirim" };
   }
