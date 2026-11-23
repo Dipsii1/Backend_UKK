@@ -23,7 +23,7 @@ export const rateLimit = (windowMs: number, max: number) => {
         if (value.resetAt <= now) buckets.delete(bucketKey);
       }
     }
-    const key = `${req.ip}:${req.path}`;
+    const key = req.ip ?? "unknown"; // tiap instance rateLimit punya Map sendiri
     const bucket = buckets.get(key);
     if (!bucket || bucket.resetAt <= now) {
       buckets.set(key, { count: 1, resetAt: now + windowMs });

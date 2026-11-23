@@ -60,6 +60,7 @@
         { "name": "Get My Event", "request": { "method": "GET", "url": "{{baseUrl}}/organizer/event/{{eventId}}" } },
         { "name": "Update My Event", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"title\": \"UKK Music Fest 2026 Updated\"\n}" }, "url": "{{baseUrl}}/organizer/event/{{eventId}}" } },
         { "name": "Delete My Event", "request": { "method": "DELETE", "url": "{{baseUrl}}/organizer/event/{{eventId}}" } },
+        { "name": "Submit Event For Review", "request": { "method": "POST", "url": "{{baseUrl}}/organizer/event/{{eventId}}/submit" } },
         { "name": "List Event Tickets", "request": { "method": "GET", "url": "{{baseUrl}}/organizer/event/{{eventId}}/tickets" } },
         { "name": "Get Event Sales", "request": { "method": "GET", "url": "{{baseUrl}}/organizer/event/{{eventId}}/sales" } },
         { "name": "Create Ticket Type", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"event_id\": \"{{eventId}}\",\n  \"name\": \"VIP\",\n  \"price\": 500000,\n  \"quota\": 100,\n  \"max_purchase\": 5\n}" }, "url": "{{baseUrl}}/organizer/tickets" } },

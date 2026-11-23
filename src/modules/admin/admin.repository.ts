@@ -6,9 +6,12 @@ import type { OrganizerQuery, TransactionLogQuery, UserQuery } from "./admin.typ
 export class AdminRepository {
   async approveEvent(eventId: bigint, adminId: bigint) {
     return prisma.$transaction(async (tx) => {
-      const event = await tx.events.findUnique({ where: { id: eventId } });
+      const event = await tx.events.findUnique({ where: { id: eventId }, include: { organizer: { select: { status: true } } } });
       if (!event) return null;
-      if (event.status !== "pending_review") return { event: null, currentStatus: event.status };
+      // Precondition dicek di dalam transaksi agar status tidak berubah di antara cek dan update.
+      if (event.status !== "pending_review" || event.organizer.status !== "verified") {
+        return { event: null, currentStatus: event.status, organizerStatus: event.organizer.status };
+      }
       const updated = await tx.events.update({
         where: { id: eventId },
         data: { status: "published", is_published: true, approved_by: adminId, approved_at: new Date(), rejected_reason: null },
@@ -16,7 +19,7 @@ export class AdminRepository {
       await tx.audit_logs.create({
         data: { user_id: adminId, action: "update", table_name: "events", record_id: eventId, old_data: { status: event.status, is_published: event.is_published }, new_data: { status: updated.status, is_published: updated.is_published } },
       });
-      return { event: updated, currentStatus: event.status };
+      return { event: updated, currentStatus: event.status, organizerStatus: event.organizer.status };
     });
   }
 

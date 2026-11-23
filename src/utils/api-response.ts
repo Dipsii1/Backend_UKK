@@ -1,4 +1,5 @@
 import type { Response } from "express";
+import { Prisma } from "../generated/prisma/client.js";
 
 export interface ApiResponse<T = unknown> {
   success: boolean;
@@ -10,9 +11,12 @@ export interface ApiResponse<T = unknown> {
 }
 
 const json = (res: Response, statusCode: number, body: ApiResponse): void => {
-  res.status(statusCode).type("json").send(JSON.stringify(body, (_, value) =>
-    typeof value === "bigint" ? value.toString() : value,
-  ));
+  // Decimal.toJSON() berjalan sebelum replacer, jadi nilai asli dibaca dari holder (this[key]).
+  res.status(statusCode).type("json").send(JSON.stringify(body, function (this: Record<string, unknown>, key, value) {
+    if (typeof value === "bigint") return value.toString();
+    const raw = this[key];
+    return Prisma.Decimal.isDecimal(raw) ? raw.toNumber() : value;
+  }));
 };
 
 export function sendSuccess<T>(res: Response, data: T, message = "Success", statusCode = 200) {

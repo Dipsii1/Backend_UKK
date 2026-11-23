@@ -31,6 +31,9 @@ type TicketInput = {
   status?: "active" | "sold_out" | "inactive";
 };
 
+// Event hanya bisa diubah strukturnya sebelum diajukan / setelah ditolak.
+const EDITABLE_EVENT_STATUSES = ["draft", "rejected"];
+
 const decimalToNumber = (value: unknown) => {
   if (typeof value === "object" && value !== null && "toNumber" in value) {
     return (value as { toNumber(): number }).toNumber();
@@ -41,10 +44,26 @@ const decimalToNumber = (value: unknown) => {
 export class OrganizerService {
   constructor(private readonly organizerRepo: OrganizerRepository = new OrganizerRepository()) {}
 
-  private async organizerFor(userId: bigint) {
+  private async organizerFor(userId: bigint, requireVerified = false) {
     const organizer = await this.organizerRepo.findByOwnerId(userId);
     if (!organizer) throw new ForbiddenError("Akun ini belum terdaftar sebagai organizer");
+    if (requireVerified && organizer.status !== "verified") {
+      throw new ForbiddenError("Organizer belum diverifikasi admin");
+    }
     return organizer;
+  }
+
+  private async editableEvent(userId: bigint, eventId: bigint) {
+    const organizer = await this.organizerFor(userId, true);
+    const event = await this.organizerRepo.findEventByIdAndOrganizer(eventId, organizer.id);
+    if (!event) throw new NotFoundError("Festival tidak ditemukan");
+    return event;
+  }
+
+  private assertEditable(status: string) {
+    if (!EDITABLE_EVENT_STATUSES.includes(status)) {
+      throw new ConflictError("Festival yang sudah diajukan atau dipublikasikan tidak dapat diubah");
+    }
   }
 
   private validateEventDates(data: Partial<EventInput>) {
@@ -74,13 +93,14 @@ export class OrganizerService {
   }
 
   async createEvent(userId: bigint, data: EventInput) {
-    const organizer = await this.organizerFor(userId);
+    const organizer = await this.organizerFor(userId, true);
     this.validateEventDates(data);
     return this.organizerRepo.createEvent({ ...data, organizer_id: organizer.id });
   }
 
   async updateEvent(userId: bigint, eventId: bigint, data: Partial<EventInput>) {
-    const event = await this.getEvent(userId, eventId);
+    const event = await this.editableEvent(userId, eventId);
+    this.assertEditable(event.status);
     this.validateEventDates({
       start_at: data.start_at ?? event.start_at,
       end_at: data.end_at ?? event.end_at,
@@ -91,11 +111,23 @@ export class OrganizerService {
   }
 
   async deleteEvent(userId: bigint, eventId: bigint) {
-    const event = await this.getEvent(userId, eventId);
+    const event = await this.editableEvent(userId, eventId);
     if (event.ticketTypes.some((ticket) => ticket.sold > 0)) {
       throw new ConflictError("Festival dengan tiket terjual tidak dapat dihapus");
     }
+    if ((await this.organizerRepo.countOrderItemsByEvent(eventId)) > 0) {
+      throw new ConflictError("Festival yang sudah memiliki order tidak dapat dihapus");
+    }
     await this.organizerRepo.deleteEvent(eventId);
+  }
+
+  async submitEvent(userId: bigint, eventId: bigint) {
+    const event = await this.editableEvent(userId, eventId);
+    this.assertEditable(event.status);
+    if (event.ticketTypes.length === 0) {
+      throw new ConflictError("Festival harus memiliki minimal satu tipe tiket sebelum diajukan");
+    }
+    return this.organizerRepo.updateEvent(eventId, { status: "pending_review", rejected_reason: null });
   }
 
   async listTickets(userId: bigint, eventId: bigint) {
@@ -113,7 +145,8 @@ export class OrganizerService {
   }
 
   async createTicket(userId: bigint, data: TicketInput) {
-    await this.getEvent(userId, data.event_id);
+    const event = await this.editableEvent(userId, data.event_id);
+    this.assertEditable(event.status);
     this.validateTicketDates(data);
     const status = data.quota === 0 ? "sold_out" : (data.status ?? "active");
     return this.organizerRepo.createTicket({ ...data, status });
@@ -126,8 +159,17 @@ export class OrganizerService {
     return ticket;
   }
 
+  private async ownedTicket(userId: bigint, ticketId: bigint) {
+    const organizer = await this.organizerFor(userId, true);
+    const ticket = await this.organizerRepo.findTicketByIdAndOrganizer(ticketId, organizer.id);
+    if (!ticket) throw new NotFoundError("Tiket tidak ditemukan");
+    return ticket;
+  }
+
   async updateTicket(userId: bigint, ticketId: bigint, data: Partial<Omit<TicketInput, "event_id">>) {
-    const ticket = await this.getTicket(userId, ticketId);
+    const ticket = await this.ownedTicket(userId, ticketId);
+    // Kuota/status boleh diubah kapan saja; harga dikunci setelah event diajukan.
+    if (data.price !== undefined) this.assertEditable(ticket.event.status);
     this.validateTicketDates({
       sale_start_at: data.sale_start_at ?? ticket.sale_start_at ?? undefined,
       sale_end_at: data.sale_end_at ?? ticket.sale_end_at ?? undefined,
@@ -141,9 +183,13 @@ export class OrganizerService {
   }
 
   async deleteTicket(userId: bigint, ticketId: bigint) {
-    const ticket = await this.getTicket(userId, ticketId);
+    const ticket = await this.ownedTicket(userId, ticketId);
+    this.assertEditable(ticket.event.status);
     if (ticket.sold > 0) {
       throw new ConflictError("Tiket yang sudah terjual tidak dapat dihapus");
+    }
+    if ((await this.organizerRepo.countOrderItemsByTicket(ticketId)) > 0) {
+      throw new ConflictError("Tiket yang sudah memiliki order tidak dapat dihapus");
     }
     await this.organizerRepo.deleteTicket(ticketId);
   }

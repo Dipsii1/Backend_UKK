@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 import { env } from "./config/env.js";
 import { prisma } from "./lib/prisma.js";
 import { setupSwagger } from "./config/swagger.js";
-import { errorHandler } from "./middlewares/error.middleware.js";
+import { errorHandler, notFoundHandler } from "./middlewares/error.middleware.js";
 import { requestLogger } from "./middlewares/logger.middleware.js";
 import { rateLimit } from "./middlewares/security.middleware.js";
 import authRouter from "./modules/auth/auth.route.js";
@@ -21,6 +21,8 @@ const app = express();
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
 app.disable("x-powered-by");
+// Aktifkan hanya bila di belakang reverse proxy; jika tidak, X-Forwarded-For bisa dipalsukan.
+if (env.TRUST_PROXY) app.set("trust proxy", 1);
 app.use(requestLogger);
 app.use(express.json({ limit: "100kb" }));
 app.use(express.urlencoded({ extended: true, limit: "100kb" }));
@@ -35,6 +37,7 @@ app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/cart", cartRouter);
 
 setupSwagger(app);
+app.use(notFoundHandler);
 app.use(errorHandler);
 
 export { app, prisma };

@@ -3,12 +3,14 @@ import { UserRepository } from "./user.repository.js";
 import { UserService } from "./user.service.js";
 import { sendSuccess } from "../../utils/api-response.js";
 import { asyncHandler } from "../../utils/async-handler.js";
+import { paginationSchema, parseSchema } from "../../utils/validation.js";
 
 const userService = new UserService(new UserRepository());
 
 export class UserController {
-  static getAll = asyncHandler(async (_req: Request, res: Response) => {
-    const users = await userService.getAll();
+  static getAll = asyncHandler(async (req: Request, res: Response) => {
+    const { page, limit } = parseSchema(paginationSchema, req.query);
+    const users = await userService.getAll(page, limit);
     sendSuccess(res, users, "Pengguna berhasil diambil");
   });
 
@@ -20,7 +22,7 @@ export class UserController {
 
   static update = asyncHandler(async (req: Request, res: Response) => {
     const id = BigInt(req.params.id as string);
-    const user = await userService.update(id, req.body, req.userRole);
+    const user = await userService.update(id, req.body, req.userRole, req.userId);
     sendSuccess(res, user, "Pengguna berhasil diperbarui");
   });
 
@@ -32,7 +34,7 @@ export class UserController {
 
   static delete = asyncHandler(async (req: Request, res: Response) => {
     const id = BigInt(req.params.id as string);
-    await userService.delete(id);
-    sendSuccess(res, null, "Pengguna berhasil dihapus");
+    await userService.delete(id, req.userId!);
+    sendSuccess(res, null, "Pengguna berhasil dinonaktifkan");
   });
 }

@@ -9,8 +9,11 @@ export class AdminService {
   async approveEvent(eventId: bigint, adminId: bigint) {
     const result = await this.adminRepo.approveEvent(eventId, adminId);
     if (!result) throw new NotFoundError("Event tidak ditemukan");
-    if (!result.event) {
+    if (!result.event && result.currentStatus !== "pending_review") {
       throw new ConflictError("Hanya event dengan status pending_review yang dapat disetujui");
+    }
+    if (!result.event) {
+      throw new ConflictError("Organizer event belum terverifikasi");
     }
     return result.event;
   }

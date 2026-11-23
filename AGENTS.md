@@ -45,28 +45,31 @@ Backend_UKK/
 ├── package.json
 ├── prisma.config.ts
 ├── tsconfig.json
-├── skills-lock.json
-├── docs/
-│   ├── index.md               # titik masuk docs
-│   ├── security.md            # checklist keamanan (auth, IDOR, transaksi)
-│   ├── specs/                 # spec per fitur & arsitektur (_template.md, auth.md, architecture.md, data_model.md, runbook.md, testing.md)
-│   └── api/conventions.md
+├── vitest.config.ts
+├── postman/                   # Postman collection seluruh endpoint
 ├── prisma/
 │   ├── schema.prisma
 │   └── migrations/            # contoh: 20260917030615_init_full_schema
+├── tests/                     # Vitest + Supertest (helpers/prisma.mock.ts)
 └── src/
+    ├── index.ts               # bootstrap Express, registrasi router, listen
+    ├── docs/
+    │   ├── index.md           # titik masuk docs
+    │   ├── security.md        # checklist keamanan (auth, IDOR, transaksi)
+    │   ├── specs/             # spec per fitur & arsitektur (template.md, auth.md, architecture.md, data_model.md, runbook.md, testing.md, ...)
+    │   └── api/conventions.md
     ├── generated/prisma/      # Prisma Client (generated — jangan edit)
-    ├── config/                # env, prisma client instance, swagger config
-    ├── modules/               # domain module (route, controller, service, repository, validation/type)
+    ├── config/                # env, swagger config (swagger/*.paths.ts)
+    ├── lib/prisma.ts          # instance Prisma (satu-satunya)
+    ├── modules/               # domain module (route, controller, service, repository, validation, types)
     │   ├── auth/
     │   ├── user/
     │   ├── event/
     │   ├── organizer/
-    │   └── admin/                 # approval event, manajemen akun, monitoring sistem
-    ├── middlewares/           # auth (JWT), role guard, validasi, error handler
-    ├── utils/                 # helper (hash, token, response, pagination)
-    ├── types/                 # tipe/DTO bersama
-    └── app.ts / server.ts     # bootstrap Express + listen
+    │   ├── cart/              # keranjang, ticket lock, checkout
+    │   └── admin/             # approval event, manajemen akun, monitoring sistem
+    ├── middlewares/           # auth (JWT), role guard, validasi, error handler, rate limit, logger
+    └── utils/                 # response, app-error, validation (parseSchema, paginationSchema), mailer
 ```
 
 ### Konvensi Struktur `src/`
@@ -75,7 +78,7 @@ Backend_UKK/
 - Router baru **wajib** didaftarkan di `src/index.ts`.
 - Helper lintas domain masuk `utils/`, bukan diduplikasi di service/controller.
 - Middleware (auth, role, validasi, error handler) masuk `middlewares/`, bukan inline di route.
-- Instance Prisma dibuat **sekali** di `config/` dan hanya diimpor oleh repository.
+- Instance Prisma dibuat **sekali** di `src/lib/prisma.ts` dan hanya diimpor oleh repository.
 - Sebelum menambah folder/file baru, cek struktur yang sudah ada dan ikuti penamaannya. Jika nama aktual di repo berbeda dari contoh di atas, **nama aktual yang menang**.
 
 **Aturan dependency:** `routes → controllers → services → repositories → prisma`. Tidak boleh terbalik, tidak boleh melompati layer.
@@ -93,10 +96,14 @@ Backend_UKK/
 
 ### Pola Auth (acuan implementasi)
 ```
-Controller → UserService → UserRepository → Prisma → PostgreSQL
+AuthController → AuthService → UserAuthRepository → Prisma → PostgreSQL
+UserController → UserService → UserRepository → Prisma → PostgreSQL
 ```
-- `UserRepository`: `findAll`, `findById`, `findByUsername`, `findByEmail`, `create`, `update`, `delete`, `createBuyerUser`, `createOrganizerUser`, `createRefreshToken`, `findRefreshToken`, `revokeRefreshToken`, `revokeAllUserRefreshTokens`.
-- `UserService`: `getAll`, `getById`, `register`, `registerOrganizer`, `login`, `getProfile`, `refresh`, `logout`.
+- `UserAuthRepository`: `findByEmail`, `findById`, `findAuthUserById`, `createBuyerUser`, `createOrganizerUser`, `createRefreshToken`, `findRefreshToken`, `revokeRefreshTokenIfActive`, `revokeAllUserRefreshTokens`, token reset password & verifikasi email.
+- `AuthService`: `register`, `registerOrganizer`, `login`, `getProfile`, `updateProfile`, `refresh`, `logout`, reset password, verifikasi email.
+- `UserRepository` / `UserService`: list (pagination), detail, update email/role, update nama, soft delete (`deactivate`).
+- Validasi input memakai `validate(schema)` di route atau `parseSchema(schema, input)` dari `src/utils/validation.ts` di controller. Jangan membuat helper parse baru per module.
+- Bila aturan bisnis harus berjalan di dalam interactive transaction (mis. cart/checkout), service mendefinisikan aturan dan menyuntikkannya ke repository (`CartRules`); repository hanya query, lock, dan tulis.
 - Fitur baru wajib mengikuti pola yang sama.
 
 ---
@@ -161,7 +168,11 @@ Jalankan dev server dan build sesuai script di `package.json` (jangan asumsikan 
 - **Error handling**: global error handler, fail-closed, jangan bocorkan stack trace ke client di production.
 - **OWASP Top 10**: terapkan kontrol untuk A01–A10 sesuai checklist `src/docs/security.md`; gunakan `authenticate` sebelum `authorize` atau `authorizeSelfOrRole` pada endpoint terlindungi.
 - **Audit**: aksi sensitif (ubah status order/pembayaran, role, check-in) dicatat ke audit log.
-- **Admin**: approval event hanya dapat dilakukan saat status `pending_review`; approval mempublikasikan event dan harus dicatat ke audit log. Perubahan status user/organizer oleh admin juga wajib tercatat.
+- **Admin**: approval event hanya dapat dilakukan saat status `pending_review` dan organizer `verified`; approval mempublikasikan event dan harus dicatat ke audit log. Perubahan status/role/soft delete user dan status organizer oleh admin juga wajib tercatat.
+- **JWT type**: access token memakai klaim `type: "access"`, refresh token `type: "refresh"`; `authenticate` hanya menerima access token dan `refresh` hanya menerima refresh token.
+- **Organizer & event**: operasi tulis organizer mewajibkan status `verified`. Alur event: `draft` → `POST /organizer/event/:id/submit` → `pending_review` → approve → `published`. Event hanya bisa diubah/dihapus/ditambah tiket saat `draft`/`rejected`; harga tiket terkunci setelah diajukan.
+- **Cart**: khusus role `buyer`; `max_purchase` dihitung lintas order `pending`/`paid`; voucher usage dilepas saat order expired; transaksi Serializable di-retry saat P2034.
+- **Error Prisma**: P2002/P2003/P2034 → `409`, P2025 → `404` (dipetakan di `errorHandler`). Route tak dikenal → JSON `404`.
 - **Token one-time**: token reset password dan verifikasi email disimpan sebagai hash, memiliki expiry, dan hanya boleh dikonsumsi sekali secara atomik. Reset password mencabut refresh token aktif pengguna.
 - **Event publik**: endpoint publik hanya boleh mengembalikan event dengan `status = published` dan `is_published = true`.
 
@@ -214,7 +225,7 @@ Testing menggunakan **Vitest** + `@vitest/coverage-v8`, **Supertest** untuk endp
 
 1. Baca file terkait (route, controller, service, repository, schema) sebelum mengubah.
 2. Jika perlu perubahan DB: ubah `schema.prisma` → `npx prisma migrate dev --name <nama>` → `npx prisma generate`.
-3. Implementasi dari layer bawah ke atas: Repository → Service → Controller → Route (+ Swagger), lalu daftarkan di `routes/index.ts`.
+3. Implementasi dari layer bawah ke atas: Repository → Service → Controller → Route (+ Swagger), lalu daftarkan di `src/index.ts`.
 4. Jalankan `npx tsc --noEmit` dan `npx prisma validate`.
 5. Commit dengan conventional commit.
 6. Setelah implementasi dan verifikasi selesai, **update `README.md`** (changelog + bagian terdampak). Update `AGENTS.md` bila ada perubahan arsitektur/behavior.

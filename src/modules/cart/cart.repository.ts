@@ -1,10 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { prisma } from "../../lib/prisma.js";
 import { Prisma } from "../../generated/prisma/client.js";
+import type { CartRules, VoucherSnapshot } from "./cart.types.js";
 
-const CART_LOCK_MINUTES = 15;
-const TAX_RATE = 0.11;
-const SERVICE_FEE = 5000;
+const MAX_SERIALIZATION_RETRIES = 3;
 
 const toNumber = (value: unknown): number => {
   if (typeof value === "number") return value;
@@ -12,9 +11,21 @@ const toNumber = (value: unknown): number => {
   return 0;
 };
 
-const money = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
-
 export class CartRepository {
+  constructor(private readonly rules: CartRules) {}
+
+  // Transaksi Serializable bisa gagal (P2034) saat bentrok; ulangi beberapa kali sebelum menyerah.
+  private async serializable<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        return await prisma.$transaction(fn, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      } catch (error) {
+        const retryable = error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034";
+        if (!retryable || attempt >= MAX_SERIALIZATION_RETRIES) throw error;
+      }
+    }
+  }
+
   private async lockTicketType(tx: Prisma.TransactionClient, ticketTypeId: bigint): Promise<void> {
     await tx.$queryRaw(
       Prisma.sql`SELECT "id" FROM "ticket_types" WHERE "id" = ${ticketTypeId} FOR UPDATE`,
@@ -27,6 +38,17 @@ export class CartRepository {
       create: { user_id: userId },
       update: {},
     });
+  }
+
+  private async purchasedQuantity(tx: Prisma.TransactionClient, userId: bigint, ticketTypeId: bigint): Promise<number> {
+    const result = await tx.order_items.aggregate({
+      where: {
+        ticket_type_id: ticketTypeId,
+        order: { user_id: userId, status: { in: ["pending", "paid"] } },
+      },
+      _sum: { quantity: true },
+    });
+    return result._sum.quantity ?? 0;
   }
 
   private async expirePendingOrders(tx: Prisma.TransactionClient, now: Date): Promise<void> {
@@ -56,6 +78,9 @@ export class CartRepository {
           data: { sold: { decrement: item.quantity } },
         });
       }
+
+      // Voucher dari order yang kadaluarsa dikembalikan agar bisa dipakai lagi.
+      await tx.voucher_usages.deleteMany({ where: { order_id: order.id } });
 
       await tx.audit_logs.create({
         data: {
@@ -106,7 +131,7 @@ export class CartRepository {
   }
 
   async upsertItem(userId: bigint, ticketTypeId: bigint, quantity: number) {
-    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    return this.serializable(async (tx) => {
       const now = new Date();
       await this.expirePendingOrders(tx, now);
       await tx.ticket_locks.deleteMany({ where: { expires_at: { lte: now } } });
@@ -118,16 +143,10 @@ export class CartRepository {
       });
 
       if (!ticket) return { reason: "not_found" as const };
+      if (!this.rules.isSellable(ticket, now)) return { reason: "unavailable" as const };
 
-      const isUnavailable =
-        ticket.status !== "active" ||
-        ticket.event.status !== "published" ||
-        !ticket.event.is_published ||
-        (ticket.sale_start_at !== null && ticket.sale_start_at > now) ||
-        (ticket.sale_end_at !== null && ticket.sale_end_at < now);
-
-      if (isUnavailable) return { reason: "unavailable" as const };
-      if (quantity > ticket.max_purchase) {
+      const purchased = await this.purchasedQuantity(tx, userId, ticketTypeId);
+      if (purchased + quantity > ticket.max_purchase) {
         return { reason: "max_purchase" as const, maxPurchase: ticket.max_purchase };
       }
 
@@ -146,7 +165,7 @@ export class CartRepository {
       }
 
       const unitPrice = toNumber(ticket.price);
-      const subtotal = money(unitPrice * quantity);
+      const { subtotal } = this.rules.calculateTotals([{ price: unitPrice, quantity }], null);
       await tx.cart_items.upsert({
         where: {
           cart_id_ticket_type_id: {
@@ -164,7 +183,7 @@ export class CartRepository {
         update: { quantity, unit_price: unitPrice, subtotal },
       });
 
-      const expiresAt = new Date(now.getTime() + CART_LOCK_MINUTES * 60_000);
+      const expiresAt = new Date(now.getTime() + this.rules.lockMinutes * 60_000);
       await tx.ticket_locks.upsert({
         where: {
           cart_id_ticket_type_id: {
@@ -181,7 +200,7 @@ export class CartRepository {
         update: { quantity, expires_at: expiresAt },
       });
       return { reason: "ok" as const, expiresAt };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    });
   }
 
   async removeItem(userId: bigint, ticketTypeId: bigint) {
@@ -195,7 +214,7 @@ export class CartRepository {
   }
 
   async checkout(userId: bigint, voucherCode?: string) {
-    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    return this.serializable(async (tx) => {
       const now = new Date();
       await this.expirePendingOrders(tx, now);
       await tx.ticket_locks.deleteMany({ where: { expires_at: { lte: now } } });
@@ -232,25 +251,17 @@ export class CartRepository {
           where: { id: item.ticket_type_id },
           include: { event: true },
         });
-        const isUnavailable =
-          !ticket ||
-          ticket.status !== "active" ||
-          ticket.event.status !== "published" ||
-          !ticket.event.is_published ||
-          (ticket.sale_start_at !== null && ticket.sale_start_at > now) ||
-          (ticket.sale_end_at !== null && ticket.sale_end_at < now) ||
-          ticket.sold + item.quantity > ticket.quota;
+        if (!ticket || !this.rules.isSellable(ticket, now) || ticket.sold + item.quantity > ticket.quota) {
+          return { reason: "unavailable" as const };
+        }
 
-        if (isUnavailable) return { reason: "unavailable" as const };
+        const purchased = await this.purchasedQuantity(tx, userId, item.ticket_type_id);
+        if (purchased + item.quantity > ticket.max_purchase) {
+          return { reason: "max_purchase" as const, maxPurchase: ticket.max_purchase };
+        }
       }
 
-      let voucher: {
-        id: bigint;
-        discount_type: "percentage" | "fixed";
-        discount_value: unknown;
-        max_discount: unknown;
-        quota: number | null;
-      } | null = null;
+      let voucher: (VoucherSnapshot & { id: bigint }) | null = null;
 
       if (voucherCode) {
         await tx.$queryRaw(
@@ -258,57 +269,51 @@ export class CartRepository {
         );
 
         const found = await tx.vouchers.findUnique({ where: { code: voucherCode } });
-        const isInvalidVoucher =
-          !found ||
-          !found.is_active ||
-          (found.start_at !== null && found.start_at > now) ||
-          (found.end_at !== null && found.end_at < now);
+        if (!found) return { reason: "invalid_voucher" as const };
 
-        if (isInvalidVoucher) return { reason: "invalid_voucher" as const };
+        const snapshot = {
+          id: found.id,
+          discount_type: found.discount_type,
+          discount_value: toNumber(found.discount_value),
+          max_discount: found.max_discount === null ? null : toNumber(found.max_discount),
+          quota: found.quota,
+          is_active: found.is_active,
+          start_at: found.start_at,
+          end_at: found.end_at,
+        };
+        const [total, byUser] = await Promise.all([
+          tx.voucher_usages.count({ where: { voucher_id: found.id } }),
+          tx.voucher_usages.count({ where: { voucher_id: found.id, user_id: userId } }),
+        ]);
 
-        const usageCount = await tx.voucher_usages.count({ where: { voucher_id: found.id } });
-        const previousUsage = await tx.voucher_usages.findFirst({
-          where: { voucher_id: found.id, user_id: userId },
-        });
-
-        if ((found.quota !== null && usageCount >= found.quota) || previousUsage) {
+        if (!this.rules.isVoucherUsable(snapshot, { total, byUser }, now)) {
           return { reason: "invalid_voucher" as const };
         }
 
-        voucher = found;
+        voucher = snapshot;
       }
-      const subtotal = money(
-        items.reduce((total, item) => total + toNumber(item.ticketType.price) * item.quantity, 0),
+
+      const totals = this.rules.calculateTotals(
+        items.map((item) => ({ price: toNumber(item.ticketType.price), quantity: item.quantity })),
+        voucher,
       );
-      const rawDiscount = voucher
-        ? voucher.discount_type === "percentage"
-          ? (subtotal * toNumber(voucher.discount_value)) / 100
-          : toNumber(voucher.discount_value)
-        : 0;
-      const discount = money(
-        Math.min(rawDiscount, toNumber(voucher?.max_discount) || rawDiscount, subtotal),
-      );
-      const taxable = money(subtotal - discount + SERVICE_FEE);
-      const tax = money(taxable * TAX_RATE);
-      const total = money(taxable + tax);
 
       const order = await tx.orders.create({
         data: {
           user_id: userId,
           order_number: `ORD-${randomUUID()}`,
-          subtotal,
-          discount,
-          service_fee: SERVICE_FEE,
-          tax,
-          total,
-          expired_at: new Date(now.getTime() + CART_LOCK_MINUTES * 60_000),
+          ...totals,
+          expired_at: new Date(now.getTime() + this.rules.lockMinutes * 60_000),
           orderItems: {
-            create: items.map((item) => ({
-              ticket_type_id: item.ticket_type_id,
-              quantity: item.quantity,
-              price: toNumber(item.ticketType.price),
-              subtotal: money(toNumber(item.ticketType.price) * item.quantity),
-            })),
+            create: items.map((item) => {
+              const price = toNumber(item.ticketType.price);
+              return {
+                ticket_type_id: item.ticket_type_id,
+                quantity: item.quantity,
+                price,
+                subtotal: this.rules.calculateTotals([{ price, quantity: item.quantity }], null).subtotal,
+              };
+            }),
           },
         },
       });
@@ -336,20 +341,13 @@ export class CartRepository {
           action: "create",
           table_name: "orders",
           record_id: order.id,
-          new_data: {
-            status: order.status,
-            subtotal,
-            discount,
-            service_fee: SERVICE_FEE,
-            tax,
-            total,
-          },
+          new_data: { status: order.status, ...totals },
         },
       });
 
       await tx.cart_items.deleteMany({ where: { cart_id: cart.id } });
       await tx.ticket_locks.deleteMany({ where: { cart_id: cart.id } });
       return { reason: "ok" as const, order };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    });
   }
 }

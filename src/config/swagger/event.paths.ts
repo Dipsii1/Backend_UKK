@@ -35,7 +35,7 @@ const validationErrorResponse = {
         properties: {
           success: { type: "boolean", example: false },
           code: { type: "string", example: "VALIDATION_ERROR" },
-          status: { type: "integer", example: 422 },
+          status: { type: "integer", example: 400 },
           message: { type: "string", example: "Validasi gagal" },
           errors: {
             type: "array",
@@ -240,7 +240,7 @@ export const eventPaths = {
             },
           },
         },
-        "422": validationErrorResponse,
+        "400": validationErrorResponse,
         "500": errorResponse("INTERNAL_ERROR", "Kesalahan server internal", 500),
       },
     },

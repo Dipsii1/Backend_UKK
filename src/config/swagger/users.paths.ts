@@ -68,17 +68,30 @@ export const usersPaths = {
   "/users": {
     get: {
       tags: ["Users"],
-      summary: "Ambil daftar semua pengguna",
+      summary: "Ambil daftar pengguna (pagination)",
       description:
-        "Mengembalikan seluruh pengguna beserta role dan profilnya. " +
+        "Mengembalikan pengguna beserta role dan profilnya dengan pagination. " +
         "**Hanya role `admin`** yang dapat mengakses endpoint ini.",
       security: [{ bearerAuth: [] }],
+      parameters: [
+        { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+        { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 10 } },
+      ],
       responses: {
         "200": {
           description: "Daftar pengguna berhasil diambil.",
           content: {
             "application/json": {
-              schema: apiResponse({ type: "array", items: userSchema }),
+              schema: apiResponse({
+                type: "object",
+                properties: {
+                  data: { type: "array", items: userSchema },
+                  total: { type: "integer" },
+                  page: { type: "integer" },
+                  limit: { type: "integer" },
+                  totalPages: { type: "integer" },
+                },
+              }),
             },
           },
         },
@@ -113,7 +126,9 @@ export const usersPaths = {
       description:
         "Memperbarui `email` dan/atau `role_id` pengguna. " +
         "Dapat diakses oleh **pemilik akun** atau role `admin`. " +
-        "**Hanya `admin`** yang boleh mengubah `role_id`.",
+        "**Hanya `admin`** yang boleh mengubah `role_id` (dicatat ke audit log). " +
+        "Mengganti email membuat `email_verified` menjadi false dan mencabut semua sesi; " +
+        "verifikasi ulang lewat `/auth/verify-email/request`.",
       security: [{ bearerAuth: [] }],
       parameters: [idParam],
       requestBody: {
@@ -137,19 +152,21 @@ export const usersPaths = {
         "401": errorResponse("UNAUTHORIZED", "Autentikasi diperlukan", 401),
         "403": errorResponse("FORBIDDEN", "Anda tidak memiliki akses untuk tindakan ini", 403),
         "404": errorResponse("NOT_FOUND", "Pengguna tidak ditemukan", 404),
+        "409": errorResponse("CONFLICT", "Data sudah digunakan", 409),
       },
     },
     delete: {
       tags: ["Users"],
-      summary: "Hapus pengguna",
+      summary: "Nonaktifkan pengguna (soft delete)",
       description:
-        "Menghapus pengguna secara permanen. " +
+        "Menonaktifkan akun (`is_active=false`), mencabut refresh token, dan mencatat audit log. " +
+        "Data order/tiket tetap tersimpan. Admin tidak dapat menghapus akunnya sendiri (409). " +
         "**Hanya role `admin`** yang dapat mengakses endpoint ini.",
       security: [{ bearerAuth: [] }],
       parameters: [idParam],
       responses: {
         "200": {
-          description: "Pengguna berhasil dihapus.",
+          description: "Pengguna berhasil dinonaktifkan.",
           content: { "application/json": { schema: apiResponse({ type: "null", example: null }) } },
         },
         "401": errorResponse("UNAUTHORIZED", "Autentikasi diperlukan", 401),
@@ -174,8 +191,9 @@ export const usersPaths = {
           "application/json": {
             schema: {
               type: "object",
+              required: ["full_name"],
               properties: {
-                full_name: { type: "string", example: "Budi Santoso", description: "Nama lengkap yang baru" },
+                full_name: { type: "string", minLength: 2, maxLength: 100, example: "Budi Santoso", description: "Nama lengkap yang baru" },
               },
             },
           },

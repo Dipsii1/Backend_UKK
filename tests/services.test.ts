@@ -8,7 +8,7 @@ import { ForbiddenError } from "../src/utils/app-error.js";
 import { OrganizerService } from "../src/modules/organizer/organizer.service.js";
 import { ConflictError } from "../src/utils/app-error.js";
 import { AdminService } from "../src/modules/admin/admin.service.js";
-import { CartService } from "../src/modules/cart/cart.service.js";
+import { CartService, cartRules } from "../src/modules/cart/cart.service.js";
 
 vi.mock("../src/utils/mailer.js", () => ({ sendMail: vi.fn().mockResolvedValue(undefined) }));
 
@@ -38,7 +38,7 @@ describe("EventService", () => {
 describe("OrganizerService", () => {
   it("rejects a ticket quota lower than the number already sold", async () => {
     const repository = {
-      findByOwnerId: vi.fn().mockResolvedValue({ id: 9n }),
+      findByOwnerId: vi.fn().mockResolvedValue({ id: 9n, status: "verified" }),
       findTicketByIdAndOrganizer: vi.fn().mockResolvedValue({ id: 7n, sold: 8, quota: 10 }),
       updateTicket: vi.fn(),
     };
@@ -306,6 +306,110 @@ describe("AuthService", () => {
     const service = new AuthService(repository as never);
 
     await expect(service.refresh("invalid")).rejects.toBeInstanceOf(UnauthorizedError);
+    expect(repository.findRefreshToken).not.toHaveBeenCalled();
+  });
+});
+
+describe("Organizer event workflow", () => {
+  const draftEvent = { id: 3n, status: "draft", ticketTypes: [{ id: 1n, sold: 0 }] };
+
+  it("blocks unverified organizers from creating events", async () => {
+    const repository = { findByOwnerId: vi.fn().mockResolvedValue({ id: 9n, status: "pending" }), createEvent: vi.fn() };
+    const service = new OrganizerService(repository as never);
+    await expect(service.createEvent(1n, {} as never)).rejects.toBeInstanceOf(ForbiddenError);
+    expect(repository.createEvent).not.toHaveBeenCalled();
+  });
+
+  it("submits a draft event with tickets for review", async () => {
+    const repository = {
+      findByOwnerId: vi.fn().mockResolvedValue({ id: 9n, status: "verified" }),
+      findEventByIdAndOrganizer: vi.fn().mockResolvedValue(draftEvent),
+      updateEvent: vi.fn().mockResolvedValue({ id: 3n, status: "pending_review" }),
+    };
+    const service = new OrganizerService(repository as never);
+    await service.submitEvent(1n, 3n);
+    expect(repository.updateEvent).toHaveBeenCalledWith(3n, { status: "pending_review", rejected_reason: null });
+  });
+
+  it("rejects submitting an event without tickets or editing a published event", async () => {
+    const repository = {
+      findByOwnerId: vi.fn().mockResolvedValue({ id: 9n, status: "verified" }),
+      findEventByIdAndOrganizer: vi.fn()
+        .mockResolvedValueOnce({ ...draftEvent, ticketTypes: [] })
+        .mockResolvedValueOnce({ ...draftEvent, status: "published" }),
+      updateEvent: vi.fn(),
+    };
+    const service = new OrganizerService(repository as never);
+    await expect(service.submitEvent(1n, 3n)).rejects.toBeInstanceOf(ConflictError);
+    await expect(service.updateEvent(1n, 3n, { title: "Baru" })).rejects.toBeInstanceOf(ConflictError);
+    expect(repository.updateEvent).not.toHaveBeenCalled();
+  });
+
+  it("refuses to delete an event that already has orders", async () => {
+    const repository = {
+      findByOwnerId: vi.fn().mockResolvedValue({ id: 9n, status: "verified" }),
+      findEventByIdAndOrganizer: vi.fn().mockResolvedValue(draftEvent),
+      countOrderItemsByEvent: vi.fn().mockResolvedValue(2),
+      deleteEvent: vi.fn(),
+    };
+    const service = new OrganizerService(repository as never);
+    await expect(service.deleteEvent(1n, 3n)).rejects.toBeInstanceOf(ConflictError);
+    expect(repository.deleteEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe("Cart rules", () => {
+  const now = new Date("2026-11-23T10:00:00Z");
+  const ticket = {
+    status: "active",
+    sale_start_at: null,
+    sale_end_at: null,
+    event: { status: "published", is_published: true, sales_start_at: null, sales_end_at: null, end_at: new Date("2026-12-01T00:00:00Z") },
+  };
+
+  it("rejects tickets after the event ended or outside the event sales window", () => {
+    expect(cartRules.isSellable(ticket, now)).toBe(true);
+    expect(cartRules.isSellable({ ...ticket, event: { ...ticket.event, end_at: new Date("2026-11-01T00:00:00Z") } }, now)).toBe(false);
+    expect(cartRules.isSellable({ ...ticket, event: { ...ticket.event, sales_end_at: new Date("2026-11-22T00:00:00Z") } }, now)).toBe(false);
+  });
+
+  it("calculates totals with a capped percentage voucher", () => {
+    const voucher = { discount_type: "percentage" as const, discount_value: 50, max_discount: 20000, quota: null, is_active: true, start_at: null, end_at: null };
+    expect(cartRules.calculateTotals([{ price: 100000, quantity: 1 }], voucher)).toEqual({
+      subtotal: 100000, discount: 20000, service_fee: 5000, tax: 9350, total: 94350,
+    });
+  });
+
+  it("treats a voucher as unusable once the user or quota has used it", () => {
+    const voucher = { discount_type: "fixed" as const, discount_value: 10000, max_discount: null, quota: 1, is_active: true, start_at: null, end_at: null };
+    expect(cartRules.isVoucherUsable(voucher, { total: 0, byUser: 0 }, now)).toBe(true);
+    expect(cartRules.isVoucherUsable(voucher, { total: 1, byUser: 0 }, now)).toBe(false);
+    expect(cartRules.isVoucherUsable({ ...voucher, quota: null }, { total: 5, byUser: 1 }, now)).toBe(false);
+  });
+});
+
+describe("Hardening", () => {
+  it("rejects approval when the event organizer is not verified", async () => {
+    const service = new AdminService({
+      approveEvent: vi.fn().mockResolvedValue({ event: null, currentStatus: "pending_review", organizerStatus: "suspended" }),
+    } as never);
+    await expect(service.approveEvent(5n, 1n)).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("prevents an admin from deleting their own account", async () => {
+    const repository = { findById: vi.fn(), deactivate: vi.fn() };
+    const service = new UserService(repository as never);
+    await expect(service.delete(1n, 1n)).rejects.toBeInstanceOf(ConflictError);
+    expect(repository.deactivate).not.toHaveBeenCalled();
+  });
+
+  it("rejects an access token presented as a refresh token", async () => {
+    const jwt = (await import("jsonwebtoken")).default;
+    const { env } = await import("../src/config/env.js");
+    const accessToken = jwt.sign({ sub: "1", type: "access" }, env.JWT_SECRET, { expiresIn: "15m" });
+    const repository = { findRefreshToken: vi.fn() };
+    const service = new AuthService(repository as never);
+    await expect(service.refresh(accessToken)).rejects.toBeInstanceOf(UnauthorizedError);
     expect(repository.findRefreshToken).not.toHaveBeenCalled();
   });
 });

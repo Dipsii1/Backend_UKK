@@ -30,8 +30,8 @@ export const cartPaths = {
     get: {
       tags: ["Cart"],
       security: auth,
-      summary: "Ambil keranjang dan masa reservasi tiket",
-      responses: { "200": ok("Keranjang"), "401": ok("Belum login") },
+      summary: "Ambil keranjang dan masa reservasi tiket (khusus buyer)",
+      responses: { "200": ok("Keranjang"), "401": ok("Belum login"), "403": ok("Khusus role buyer") },
     },
   },
   "/cart/items": {

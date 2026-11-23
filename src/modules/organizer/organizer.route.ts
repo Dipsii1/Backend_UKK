@@ -11,6 +11,7 @@ router.post("/event", authenticate, authorize("organizer"), OrganizerController.
 router.get("/event/:id", requireNumericId, authenticate, authorize("organizer"), OrganizerController.getEvent);
 router.patch("/event/:id", requireNumericId, authenticate, authorize("organizer"), OrganizerController.updateEvent);
 router.delete("/event/:id", requireNumericId, authenticate, authorize("organizer"), OrganizerController.deleteEvent);
+router.post("/event/:id/submit", requireNumericId, authenticate, authorize("organizer"), OrganizerController.submitEvent);
 
 // Organizer only - tickets and sales monitoring
 router.get("/event/:id/tickets", requireNumericId, authenticate, authorize("organizer"), OrganizerController.listTickets);

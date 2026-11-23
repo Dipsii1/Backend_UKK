@@ -12,7 +12,7 @@ export class AppError extends Error {
 
 export class ValidationError extends AppError {
   constructor(message = "Validasi gagal", errors?: unknown) {
-    super(422, "VALIDATION_ERROR", message, errors);
+    super(400, "VALIDATION_ERROR", message, errors);
   }
 }
 

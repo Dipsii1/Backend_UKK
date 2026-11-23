@@ -64,9 +64,13 @@ CORS_ORIGIN=http://localhost:3000
 # SMTP (verifikasi email & reset kata sandi)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
+SMTP_SECURE=false
 SMTP_USER=email@gmail.com
 SMTP_PASS=app-password
-SMTP_FROM="Backend UKK <email@gmail.com>"
+SMTP_FROM="Tixo <email@gmail.com>"
+
+# Reverse proxy (true hanya jika di belakang proxy/load balancer)
+TRUST_PROXY=false
 ```
 
 | Variabel | Keterangan |
@@ -79,7 +83,8 @@ SMTP_FROM="Backend UKK <email@gmail.com>"
 | `PORT` | Port server |
 | `CLIENT_URL` | Dipakai untuk link email verifikasi & reset kata sandi |
 | `CORS_ORIGIN` | Origin frontend yang diizinkan mengirim cookie |
-| `SMTP_*` | Konfigurasi pengiriman email |
+| `SMTP_*` | Konfigurasi pengiriman email (`SMTP_SECURE=true` untuk port 465) |
+| `TRUST_PROXY` | Percayai `X-Forwarded-For` dari satu proxy (untuk rate limit per IP) |
 
 ## 🚀 Menjalankan
 
@@ -155,10 +160,10 @@ Postman Collection seluruh endpoint tersedia di [`postman/UKK_2026.postman_colle
 
 | Method | Path | Akses | Keterangan |
 |:------:|------|:-----:|------------|
-| `GET` | `/api/v1/users` | 🔒 admin | Daftar semua pengguna |
+| `GET` | `/api/v1/users` | 🔒 admin | Daftar pengguna (pagination `page`, `limit`) |
 | `GET` | `/api/v1/users/:id` | 👤 pemilik / admin | Detail pengguna by ID |
-| `PUT` | `/api/v1/users/:id` | 👤 pemilik / admin | Update pengguna (role hanya admin) |
-| `DELETE` | `/api/v1/users/:id` | 🔒 admin | Hapus pengguna |
+| `PUT` | `/api/v1/users/:id` | 👤 pemilik / admin | Update email (wajib verifikasi ulang) / role (hanya admin, diaudit) |
+| `DELETE` | `/api/v1/users/:id` | 🔒 admin | Nonaktifkan pengguna (soft delete, sesi dicabut, diaudit) |
 | `PATCH` | `/api/v1/users/:id/profile` | 👤 pemilik / admin | Update profil (`full_name`) |
 
 ### Event
@@ -166,16 +171,19 @@ Postman Collection seluruh endpoint tersedia di [`postman/UKK_2026.postman_colle
 | Method | Path | Akses | Keterangan |
 |:------:|------|:-----:|------------|
 | `GET` | `/api/v1/events` | Publik | Daftar event dengan pagination & filter (lokasi, tanggal, kategori, harga) |
-| `GET` | `/api/v1/events/:id` | Publik | Detail event & daftar jenis tiket aktif |
+| `GET` | `/api/v1/events/:id` | Publik | Detail event & daftar jenis tiket (kecuali `inactive`) |
 
 ### Organizer
 
-Semua endpoint berikut memerlukan JWT dengan role `organizer`; akses data juga dibatasi ke organizer pemilik festival.
+Semua endpoint berikut memerlukan JWT dengan role `organizer`; akses data juga dibatasi ke organizer pemilik festival. Operasi tulis (buat/ubah/hapus/ajukan) hanya untuk organizer berstatus `verified`.
+
+Alur status festival: `draft` → (`submit`) → `pending_review` → (admin approve) → `published`. Festival hanya bisa diubah, dihapus, atau ditambah tiketnya saat berstatus `draft`/`rejected`; setelah diajukan, tiket hanya boleh diubah kuota/statusnya (harga terkunci).
 
 | Method | Path | Keterangan |
 |:------:|------|------------|
 | `GET`, `POST` | `/api/v1/organizer/event` | Daftar (pagination) dan buat festival |
-| `GET`, `PATCH`, `DELETE` | `/api/v1/organizer/event/:id` | CRUD festival; festival bertiket terjual tidak dapat dihapus |
+| `GET`, `PATCH`, `DELETE` | `/api/v1/organizer/event/:id` | CRUD festival; festival bertiket terjual atau memiliki order tidak dapat dihapus |
+| `POST` | `/api/v1/organizer/event/:id/submit` | Ajukan festival `draft`/`rejected` (minimal satu tipe tiket) untuk direview admin |
 | `GET` | `/api/v1/organizer/event/:id/tickets` | Daftar tiket pada festival |
 | `GET` | `/api/v1/organizer/event/:id/sales` | Monitoring order paid, tiket terjual, pendapatan, dan kuota per tipe tiket |
 | `POST` | `/api/v1/organizer/tickets` | Buat tipe tiket dan kuota |
@@ -183,7 +191,7 @@ Semua endpoint berikut memerlukan JWT dengan role `organizer`; akses data juga d
 
 ### Cart
 
-Semua endpoint cart memerlukan JWT. Item keranjang menahan kuota tiket selama 15 menit.
+Semua endpoint cart memerlukan JWT dengan role `buyer`. Item keranjang menahan kuota tiket selama 15 menit. `max_purchase` dihitung dari keranjang ditambah order `pending`/`paid` milik user.
 
 | Method | Path | Keterangan |
 |:------:|------|------------|
@@ -198,7 +206,7 @@ Semua endpoint berikut memerlukan JWT dengan role `admin`. Perubahan status dan 
 
 | Method | Path | Keterangan |
 |:------:|------|------------|
-| `PUT` | `/api/v1/admin/event/:id/approve` | Menyetujui event `pending_review` dan mempublikasikannya |
+| `PUT` | `/api/v1/admin/event/:id/approve` | Menyetujui event `pending_review` milik organizer `verified` dan mempublikasikannya |
 | `GET` | `/api/v1/admin/users` | Daftar pengguna dengan pagination serta filter `search`, `role`, dan `is_active` |
 | `PATCH` | `/api/v1/admin/users/:id/status` | Mengaktifkan/menonaktifkan akun melalui body `{ "is_active": boolean }` |
 | `GET` | `/api/v1/admin/organizers` | Daftar organizer dengan pagination dan filter status |
@@ -242,6 +250,16 @@ npm run test:coverage
 Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock Prisma; test HTTP memock singleton Prisma sehingga tidak membutuhkan database atau layanan eksternal. Helper `tests/helpers/prisma.mock.ts` tersedia untuk test repository/unit yang membutuhkan Prisma mock dengan reset otomatis.
 
 ## 📝 Changelog
+
+### 2026-11-23 — Perbaikan bug & konsistensi
+- **Alur event**: endpoint baru `POST /organizer/event/:id/submit` (`draft`/`rejected` → `pending_review`); sebelumnya event tidak pernah bisa dipublikasikan. Event yang sudah diajukan/published tidak bisa diubah; harga tiket terkunci.
+- **Keamanan token**: access & refresh token kini membawa klaim `type`; refresh token tidak lagi diterima sebagai access token (dan sebaliknya). Token lama tanpa `type` harus login ulang.
+- **Organizer**: operasi tulis mewajibkan status `verified`; approve admin juga menolak organizer yang belum terverifikasi.
+- **Error handling**: kode status validasi menjadi `400` (sesuai konvensi); error Prisma P2002/P2003 → `409`, P2025 → `404`, P2034 → `409`; JSON rusak → `400`, body terlalu besar → `413`; route tak dikenal → JSON `404`.
+- **Cart**: khusus role `buyer`; cek periode jual event dan `end_at`; `max_purchase` lintas order; voucher dikembalikan saat order expired; retry otomatis untuk konflik transaksi Serializable; aturan bisnis (sellable, voucher, total) dipindah ke service.
+- **User**: validasi body `PUT /users/:id` dan `PATCH /users/:id/profile`; ganti email mewajibkan verifikasi ulang dan mencabut sesi; perubahan role diaudit; `GET /users` berpagination; `DELETE /users/:id` menjadi soft delete (sebelumnya selalu gagal karena foreign key).
+- **Organizer delete**: hapus event/tiket ikut membersihkan item cart; ditolak `409` bila sudah ada order.
+- **Lainnya**: verifikasi email atomik; halaman reset password diperbaiki; token one-time tidak lagi tercatat di log request; `SMTP_SECURE` dan `REFRESH_TOKEN_TTL_DAYS` dipakai konsisten; rate limit per IP + opsi `TRUST_PROXY`; filter `date` divalidasi; nilai Decimal (uang) selalu dikirim sebagai number; helper validasi & `paginationSchema` disatukan di `src/utils/validation.ts`.
 
 ### 2026-11-22 — Cart, ticket locking, dan checkout order
 
