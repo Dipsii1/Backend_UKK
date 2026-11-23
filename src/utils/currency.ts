@@ -1,3 +1,9 @@
+// Prisma Decimal (atau angka biasa) -> number; null/undefined -> 0.
+export const toNumber = (value: unknown): number =>
+  typeof value === "object" && value !== null && "toNumber" in value
+    ? (value as { toNumber(): number }).toNumber()
+    : Number(value ?? 0);
+
 const rupiah = new Intl.NumberFormat("id-ID", {
   style: "currency",
   currency: "IDR",

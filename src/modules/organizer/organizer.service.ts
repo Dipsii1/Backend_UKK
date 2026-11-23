@@ -1,16 +1,10 @@
 import { OrganizerRepository } from "./organizer.repository.js";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../../utils/app-error.js";
 import type { EventInput, TicketInput } from "./organizer.types.js";
+import { toNumber } from "../../utils/currency.js";
 
 // Event hanya bisa diubah strukturnya sebelum diajukan / setelah ditolak.
 const EDITABLE_EVENT_STATUSES = ["draft", "rejected"];
-
-const decimalToNumber = (value: unknown) => {
-  if (typeof value === "object" && value !== null && "toNumber" in value) {
-    return (value as { toNumber(): number }).toNumber();
-  }
-  return Number(value);
-};
 
 export class OrganizerService {
   constructor(private readonly organizerRepo: OrganizerRepository = new OrganizerRepository()) {}
@@ -176,8 +170,8 @@ export class OrganizerService {
     if (!event) throw new NotFoundError("Festival tidak ditemukan");
     const ticketTypes = event.ticketTypes.map((ticket) => {
       const ticketsSold = ticket.orderItems.reduce((total, item) => total + item.quantity, 0);
-      const revenue = ticket.orderItems.reduce((total, item) => total + decimalToNumber(item.subtotal), 0);
-      return { id: ticket.id, public_id: ticket.public_id, name: ticket.name, price: decimalToNumber(ticket.price), quota: ticket.quota, sold: ticket.sold, available: Math.max(ticket.quota - ticket.sold, 0), paid_tickets: ticketsSold, revenue, paid_order_ids: ticket.orderItems.map((item) => item.order_id) };
+      const revenue = ticket.orderItems.reduce((total, item) => total + toNumber(item.subtotal), 0);
+      return { id: ticket.id, public_id: ticket.public_id, name: ticket.name, price: toNumber(ticket.price), quota: ticket.quota, sold: ticket.sold, available: Math.max(ticket.quota - ticket.sold, 0), paid_tickets: ticketsSold, revenue, paid_order_ids: ticket.orderItems.map((item) => item.order_id) };
     });
     const orderIds = new Set(ticketTypes.flatMap((ticket) => ticket.paid_order_ids.map(String)));
     return {

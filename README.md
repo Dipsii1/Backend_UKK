@@ -341,6 +341,8 @@ Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock 
 ## 📝 Changelog
 
 ### 2026-11-26 — Perbaikan hasil audit
+- Peta error lama berbasis `error.message` (`EMAIL_EXISTS`, dll.) di error handler dihapus karena tidak lagi dipakai; semua error domain memakai `AppError`.
+- Tiga salinan konversi Decimal → number disatukan menjadi `toNumber` di `src/utils/currency.ts`.
 - Test repository cart (`tests/cart-repository.test.ts`) untuk penjaga anti-oversell: kuota memperhitungkan reservasi cart lain, kursi terakhir tepat di kuota, checkout menaikkan `sold` dan mengosongkan cart, serta menolak bila stok sudah diambil atau reservasi kadaluarsa.
 - Pengiriman email verifikasi di `AuthService` disatukan (`issueVerification`/`mailVerification`) dari tiga salinan.
 - Konfigurasi coverage kini menunjuk ke `src/modules/**/*.{controller,service}.ts` (sebelumnya folder lama yang sudah tidak ada, sehingga coverage selalu 0/0). Ditambah test controller via HTTP dan test aturan bisnis organizer/admin/cart/notification; coverage kini ~96% statements, ~92% branches.

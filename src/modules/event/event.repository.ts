@@ -1,15 +1,7 @@
 import { prisma } from "../../lib/prisma.js";
 import type { Prisma } from "../../generated/prisma/client.js";
 import type { EventQuery, EventListResult, EventDetail } from "./event.types.js";
-import { formatRupiah } from "../../utils/currency.js";
-
-const toNumber = (value: unknown): number => {
-  if (value === null || value === undefined) return 0;
-  if (typeof value === "object" && "toNumber" in value) {
-    return (value as { toNumber: () => number }).toNumber();
-  }
-  return typeof value === "number" ? value : 0;
-};
+import { formatRupiah, toNumber } from "../../utils/currency.js";
 
 export class EventRepository {
   async findAll(params: EventQuery): Promise<EventListResult> {

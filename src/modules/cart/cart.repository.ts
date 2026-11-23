@@ -2,14 +2,9 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "../../lib/prisma.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import type { CartRules, VoucherSnapshot } from "./cart.types.js";
+import { toNumber } from "../../utils/currency.js";
 
 const MAX_SERIALIZATION_RETRIES = 3;
-
-const toNumber = (value: unknown): number => {
-  if (typeof value === "number") return value;
-  if (value && typeof value === "object" && "toNumber" in value) return (value as { toNumber: () => number }).toNumber();
-  return 0;
-};
 
 // Transaksi Serializable bisa gagal (P2034) saat bentrok; ulangi beberapa kali sebelum menyerah.
 export async function runSerializable<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {

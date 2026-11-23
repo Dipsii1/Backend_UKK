@@ -2,17 +2,9 @@ import type { Request, Response, NextFunction } from "express";
 import { ZodError, type ZodSchema } from "zod";
 import { env } from "../config/env.js";
 import { Prisma } from "../generated/prisma/client.js";
-import { AppError, ValidationError, ConflictError, UnauthorizedError, ForbiddenError, NotFoundError } from "../utils/app-error.js";
+import { AppError, ValidationError, ConflictError, NotFoundError } from "../utils/app-error.js";
 import { sendError } from "../utils/api-response.js";
 import { parseSchema } from "../utils/validation.js";
-
-const errorMap: Record<string, AppError> = {
-  EMAIL_EXISTS: new ConflictError("Email sudah terdaftar"),
-  INVALID_CREDENTIALS: new UnauthorizedError("Email Atau Password Salah"),
-  INVALID_TOKEN: new UnauthorizedError("Token tidak valid atau sudah kadaluarsa"),
-  ACCOUNT_SUSPENDED: new ForbiddenError("Akun sudah tidak aktif"),
-  NOT_FOUND: new NotFoundError("Tidak ditemukan"),
-};
 
 const prismaErrorMap: Record<string, AppError> = {
   P2002: new ConflictError("Data sudah digunakan"),
@@ -85,15 +77,6 @@ export const errorHandler = (
     }
     if (httpError.expose && httpError.status && httpError.status >= 400 && httpError.status < 500) {
       sendError(res, "BAD_REQUEST", "Permintaan tidak valid", httpError.status);
-      return;
-    }
-
-    const mapped = errorMap[error.message];
-    if (mapped) {
-      if (env.NODE_ENV === "development") {
-        console.error(`[${mapped.code}] ${req.method} ${req.path}:`, error.message);
-      }
-      sendError(res, mapped.code, error.message, mapped.statusCode, mapped.errors);
       return;
     }
 

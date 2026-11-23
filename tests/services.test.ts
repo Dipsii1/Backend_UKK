@@ -12,7 +12,8 @@ import { CartService, cartRules } from "../src/modules/cart/cart.service.js";
 import { PaymentService, mapMidtransStatus, paymentRules } from "../src/modules/payment/payment.service.js";
 import { midtrans } from "../src/utils/midtrans.js";
 import { env } from "../src/config/env.js";
-import { formatRupiah } from "../src/utils/currency.js";
+import { formatRupiah, toNumber } from "../src/utils/currency.js";
+import { Prisma } from "../src/generated/prisma/client.js";
 
 vi.mock("../src/utils/mailer.js", () => ({ sendMail: vi.fn().mockResolvedValue(undefined) }));
 
@@ -611,5 +612,14 @@ describe("PaymentService", () => {
     expect(paymentRules.isPayable({ ...order, expired_at: new Date(now.getTime() + 30_000) }, now)).toBe(false);
     expect(paymentRules.isPayable({ ...order, status: "paid" }, now)).toBe(false);
     expect(paymentRules.grossAmount({ ...order, total: 1000.5 })).toBe(1001);
+  });
+});
+
+describe("toNumber", () => {
+  it("converts Prisma Decimals and plain values, treating null as zero", () => {
+    expect(toNumber(new Prisma.Decimal("116550.50"))).toBe(116550.5);
+    expect(toNumber(150000)).toBe(150000);
+    expect(toNumber(null)).toBe(0);
+    expect(toNumber(undefined)).toBe(0);
   });
 });
