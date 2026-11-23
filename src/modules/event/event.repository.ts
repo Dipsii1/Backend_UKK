@@ -41,8 +41,9 @@ export class EventRepository {
     }
 
     if (date) {
-      const start = new Date(`${date}T00:00:00.000Z`);
-      const end = new Date(`${date}T23:59:59.999Z`);
+      // Tanggal dibaca sebagai hari kalender WIB (UTC+7), bukan UTC.
+      const start = new Date(`${date}T00:00:00.000+07:00`);
+      const end = new Date(`${date}T23:59:59.999+07:00`);
       where.start_at = { gte: start, lte: end };
     }
 

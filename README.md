@@ -339,6 +339,8 @@ Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock 
 ## 📝 Changelog
 
 ### 2026-11-26 — Perbaikan hasil audit
+- Filter `?date=YYYY-MM-DD` di daftar event publik kini dibaca sebagai hari kalender WIB (UTC+7). Sebelumnya UTC, sehingga event antara 00:00–06:59 WIB muncul di tanggal sebelumnya.
+- Saat email user diganti (`PUT /users/:id`), email verifikasi otomatis dikirim ke alamat baru. Status `email_verified` direset dan refresh token dicabut, sehingga user harus memverifikasi alamat baru sebelum bisa memakai API lagi.
 - Error 500 tak terduga kini selalu dicatat ke log, termasuk di production. Stack trace tetap hanya dikirim ke client saat development.
 - Job tiap 1 menit (di proses server) melepas stok order `pending` yang lewat `expired_at`, sehingga tiket yang tidak dibayar kembali tersedia walau tidak ada aktivitas cart. Memakai transaksi Serializable dan guard status yang sama dengan cart, jadi stok tidak dilepas dua kali.
 

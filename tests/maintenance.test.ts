@@ -5,6 +5,7 @@ import { env } from "../src/config/env.js";
 import { errorHandler } from "../src/middlewares/error.middleware.js";
 import { CartRepository } from "../src/modules/cart/cart.repository.js";
 import { cartRules } from "../src/modules/cart/cart.service.js";
+import { EventRepository } from "../src/modules/event/event.repository.js";
 
 vi.mock("../src/lib/prisma.js", async () => ({ prisma: (await import("./helpers/prisma.mock.js")).prismaMock }));
 
@@ -59,5 +60,16 @@ describe("Stale order expiry job", () => {
     await new CartRepository(cartRules).expireStaleOrders();
 
     expect(prismaMock.ticket_types.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("Public event date filter", () => {
+  it("treats ?date= as a WIB calendar day, so a 05:00 WIB event is found on its own date", async () => {
+    prismaMock.$transaction.mockResolvedValue([[], 0] as never);
+
+    await new EventRepository().findAll({ page: 1, limit: 10, date: "2026-12-01" });
+
+    const where = prismaMock.events.findMany.mock.calls[0][0]!.where!;
+    expect(where.start_at).toEqual({ gte: new Date("2026-11-30T17:00:00.000Z"), lte: new Date("2026-12-01T16:59:59.999Z") });
   });
 });

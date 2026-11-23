@@ -1,8 +1,12 @@
 import { UserRepository } from "./user.repository.js";
+import { AuthService } from "../auth/auth.service.js";
 import { NotFoundError, ConflictError } from "../../utils/app-error.js";
 
 export class UserService {
-  constructor(private readonly userRepo: UserRepository = new UserRepository()) {}
+  constructor(
+    private readonly userRepo: UserRepository = new UserRepository(),
+    private readonly authService: Pick<AuthService, "requestEmailVerification"> = new AuthService(),
+  ) {}
 
   async getAll(page: number, limit: number) {
     const result = await this.userRepo.findAll(page, limit);
@@ -24,8 +28,12 @@ export class UserService {
     if (!changeRole && !changeEmail) return user;
 
     if (changeRole) await this.userRepo.changeRole(id, data.role_id!, requesterId!);
-    // Email duplikat ditangani constraint unik (P2002 -> 409).
-    if (changeEmail) await this.userRepo.update(id, { email: data.email });
+    // Email duplikat ditangani constraint unik (P2002 -> 409). Repository men-set email_verified=false
+    // dan mencabut refresh token; kirim verifikasi ke alamat baru agar user tidak terkunci tanpa petunjuk.
+    if (changeEmail) {
+      await this.userRepo.update(id, { email: data.email });
+      await this.authService.requestEmailVerification(data.email!);
+    }
 
     return this.getById(id);
   }

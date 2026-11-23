@@ -157,11 +157,27 @@ describe("UserService", () => {
       findById: vi.fn().mockResolvedValue({ id: 1n }),
       update: vi.fn().mockResolvedValue({ id: 1n, email: "updated@example.com" }),
     };
-    const service = new UserService(repository as never);
+    const service = new UserService(repository as never, { requestEmailVerification: vi.fn() });
 
     await service.update(1n, { email: "updated@example.com", role_id: 2n }, "buyer");
 
     expect(repository.update).toHaveBeenCalledWith(1n, { email: "updated@example.com" });
+  });
+
+  it("sends a verification email to the new address after an email change", async () => {
+    const repository = {
+      findById: vi.fn().mockResolvedValue({ id: 1n, email: "old@example.com" }),
+      update: vi.fn().mockResolvedValue({ id: 1n, email: "new@example.com" }),
+    };
+    const authService = { requestEmailVerification: vi.fn().mockResolvedValue({ message: "ok" }) };
+    const service = new UserService(repository as never, authService);
+
+    await service.update(1n, { email: "new@example.com" }, "buyer");
+    expect(authService.requestEmailVerification).toHaveBeenCalledWith("new@example.com");
+
+    authService.requestEmailVerification.mockClear();
+    await service.update(1n, { email: "old@example.com" }, "buyer");
+    expect(authService.requestEmailVerification).not.toHaveBeenCalled();
   });
 });
 
