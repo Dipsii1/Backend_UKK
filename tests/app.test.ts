@@ -7,6 +7,7 @@ import { Prisma } from "../src/generated/prisma/client.js";
 
 const prismaMock = vi.hoisted(() => ({
   $transaction: vi.fn(),
+  $queryRaw: vi.fn(),
   events: { findFirst: vi.fn(), findMany: vi.fn(), count: vi.fn() },
   roles: { upsert: vi.fn() },
   organizers: { findUnique: vi.fn(), create: vi.fn() },
@@ -255,5 +256,16 @@ describe("HTTP routes", () => {
     prismaMock.users.findUnique.mockResolvedValueOnce(admin);
     const response = await request(app).get("/api/v1/cart").set("Authorization", `Bearer ${tokenFor(2n)}`);
     expect(response.status).toBe(403);
+  });
+  it("reports health with database status", async () => {
+    prismaMock.$queryRaw.mockResolvedValueOnce([{ "?column?": 1 }]);
+    const up = await request(app).get("/api/v1/health");
+    prismaMock.$queryRaw.mockRejectedValueOnce(new Error("connection refused"));
+    const down = await request(app).get("/api/v1/health");
+
+    expect([up.status, down.status]).toEqual([200, 503]);
+    expect(up.body.data).toMatchObject({ status: "ok", database: "up" });
+    expect(down.body).toMatchObject({ success: false, code: "SERVICE_UNAVAILABLE", errors: { status: "degraded", database: "down" } });
+    expect(JSON.stringify(down.body)).not.toContain("connection refused");
   });
 });

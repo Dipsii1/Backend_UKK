@@ -67,6 +67,7 @@ Backend_UKK/
     │   ├── event/
     │   ├── organizer/
     │   ├── cart/              # keranjang, ticket lock, checkout
+    │   ├── health/            # GET /api/v1/health (cek koneksi database)
     │   └── admin/             # approval event, manajemen akun, monitoring sistem
     ├── middlewares/           # auth (JWT), role guard, validasi, error handler, rate limit, logger
     └── utils/                 # response, app-error, validation (parseSchema, paginationSchema), mailer

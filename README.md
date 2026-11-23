@@ -139,6 +139,12 @@ Postman Collection seluruh endpoint tersedia di [`postman/UKK_2026.postman_colle
 
 ## 🔌 Endpoint
 
+### Health
+
+| Method | Path | Akses | Keterangan |
+|:------:|------|:-----:|------------|
+| `GET` | `/api/v1/health` | Publik | Status layanan, uptime, dan koneksi database (`200` normal, `503` bila database tidak terjangkau) |
+
 ### Auth
 
 | Method | Path | Keterangan |
@@ -250,6 +256,9 @@ npm run test:coverage
 Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock Prisma; test HTTP memock singleton Prisma sehingga tidak membutuhkan database atau layanan eksternal. Helper `tests/helpers/prisma.mock.ts` tersedia untuk test repository/unit yang membutuhkan Prisma mock dengan reset otomatis.
 
 ## 📝 Changelog
+
+### 2026-11-23 — Health check
+- Endpoint publik `GET /api/v1/health` (module `health`) untuk uptime monitor / load balancer: mengecek koneksi database dengan `SELECT 1`, mengembalikan `200` bila normal dan `503` bila database tidak terjangkau. Detail error database tidak dibocorkan.
 
 ### 2026-11-23 — Perbaikan bug & konsistensi
 - **Alur event**: endpoint baru `POST /organizer/event/:id/submit` (`draft`/`rejected` → `pending_review`); sebelumnya event tidak pernah bisa dipublikasikan. Event yang sudah diajukan/published tidak bisa diubah; harga tiket terkunci.

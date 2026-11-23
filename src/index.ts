@@ -15,6 +15,7 @@ import eventRouter from "./modules/event/event.route.js";
 import organizerRouter from "./modules/organizer/organizer.route.js";
 import adminRouter from "./modules/admin/admin.route.js";
 import cartRouter from "./modules/cart/cart.route.js";
+import healthRouter from "./modules/health/health.route.js";
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use(express.urlencoded({ extended: true, limit: "100kb" }));
 app.use(cookieParser());
 app.use("/api", rateLimit(15 * 60 * 1000, 300));
 
+app.use("/api/v1/health", healthRouter);
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/events", eventRouter);

@@ -6,12 +6,14 @@ import { eventPaths } from "./swagger/event.paths.js";
 import { organizerPaths } from "./swagger/organizer.paths.js";
 import { adminPaths } from "./swagger/admin.paths.js";
 import { cartPaths } from "./swagger/cart.paths.js";
+import { healthPaths } from "./swagger/health.paths.js";
 
 const swaggerDocument = {
   openapi: "3.0.0",
   info: { title: "UKK API", version: "1.0.0" },
   servers: [{ url: "/api/v1" }],
   tags: [
+    { name: "Health", description: "Status layanan dan koneksi database" },
     { name: "Auth", description: "Autentikasi & otorisasi" },
     { name: "Users", description: "Manajemen pengguna" },
     { name: "Events", description: "Manajemen event" },
@@ -19,7 +21,7 @@ const swaggerDocument = {
     { name: "Admin", description: "Approval event, manajemen pengguna dan organizer, serta monitoring sistem" },
     { name: "Cart", description: "Keranjang sementara, reservasi tiket, dan checkout" },
   ],
-  paths: { ...authPaths, ...usersPaths, ...eventPaths, ...organizerPaths, ...adminPaths, ...cartPaths },
+  paths: { ...healthPaths, ...authPaths, ...usersPaths, ...eventPaths, ...organizerPaths, ...adminPaths, ...cartPaths },
   components: {
     securitySchemes: {
       bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
