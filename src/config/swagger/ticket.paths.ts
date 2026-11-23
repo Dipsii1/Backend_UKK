@@ -84,7 +84,7 @@ export const ticketPaths = {
       security: auth,
       summary: "Scan QR e-ticket (organizer pemilik event yang terverifikasi, atau admin)",
       description:
-        "Validasi dalam satu transaksi dengan row lock: token ditemukan, tiket untuk event ini, order PAID, tiket tidak dibatalkan, dan belum dipakai. Setiap scan dicatat di ticket_scans; check-in sukses dicatat di audit log. Scan tidak pernah membuat tiket baru.",
+        "Validasi dalam satu transaksi dengan row lock: tiket untuk event ini, jendela check-in (gate_open_at, atau start_at bila kosong, sampai end_at), order PAID, tiket tidak dibatalkan/kadaluarsa, dan belum dipakai. Gagal validasi tidak mengubah status tiket. Setiap scan tercatat di ticket_scans (petugas, waktu, event, hasil); check-in sukses menyimpan checked_in_at dan checked_in_by serta dicatat di audit log. Scan tidak pernah membuat tiket baru.",
       requestBody: {
         required: true,
         content: {
@@ -94,18 +94,19 @@ export const ticketPaths = {
               required: ["event_id", "qr_token"],
               properties: {
                 event_id: { type: "string", example: "4" },
-                qr_token: { type: "string", description: "Isi QR hasil scan" },
+                qr_token: { type: "string", description: "Isi QR hasil scan (43 karakter base64url)" },
               },
             },
           },
         },
       },
       responses: {
-        "200": ok("Check-in berhasil: ticket_code, ticket_type, status USED, checked_in_at"),
-        "400": ok("Body tidak valid"),
-        "403": ok("Bukan organizer pemilik event / organizer belum terverifikasi"),
-        "404": ok("Event atau token tiket tidak ditemukan"),
-        "409": ok("Tiket sudah digunakan, bukan untuk event ini, dibatalkan, atau order belum dibayar"),
+        "200": ok("Check-in berhasil: ticket_code, ticket_type, status USED, checked_in_at, checked_in_by"),
+        "400": ok("VALIDATION_ERROR — body tidak valid atau format QR tidak valid"),
+        "401": ok("UNAUTHORIZED — belum login"),
+        "403": ok("FORBIDDEN (bukan organizer/admin) atau CHECKIN_FORBIDDEN (bukan pemilik event / organizer belum verified)"),
+        "404": ok("EVENT_NOT_FOUND atau TICKET_NOT_FOUND (token tidak dikenal)"),
+        "409": ok("WRONG_EVENT, CHECKIN_NOT_OPEN, CHECKIN_CLOSED, TICKET_UNPAID, TICKET_CANCELLED, TICKET_EXPIRED, atau TICKET_USED"),
       },
     },
   },

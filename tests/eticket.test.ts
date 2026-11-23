@@ -6,7 +6,7 @@ import { paymentRules } from "../src/modules/payment/payment.service.js";
 import { CheckInRepository } from "../src/modules/check-in/check-in.repository.js";
 import { CheckInService, checkInRules } from "../src/modules/check-in/check-in.service.js";
 import { TicketService } from "../src/modules/ticket/ticket.service.js";
-import { ConflictError, ForbiddenError, NotFoundError } from "../src/utils/app-error.js";
+import { NotFoundError } from "../src/utils/app-error.js";
 
 vi.mock("../src/lib/prisma.js", async () => ({ prisma: (await import("./helpers/prisma.mock.js")).prismaMock }));
 
@@ -76,77 +76,132 @@ describe("E-ticket issuance on payment notification", () => {
 });
 
 describe("Check-in with QR token", () => {
+  const hour = 3_600_000;
+  const window = { eventId: 4n, opensAt: new Date(Date.now() - hour), closesAt: new Date(Date.now() + hour) };
   const ticket = {
     id: 21n,
     ticket_code: "TCK-1",
     status: "issued",
+    checked_in_by: null,
     order: { status: "paid" },
     ticketType: { event_id: 4n, name: "VIP" },
   };
 
-  it("checks in a valid QR token and never creates a new ticket", async () => {
+  const lockTicket = (found: object | null) => {
     runTransactionsOnMock();
-    prismaMock.$queryRaw.mockResolvedValue([{ id: 21n }] as never);
-    prismaMock.tickets.findUniqueOrThrow.mockResolvedValue(ticket as never);
-    prismaMock.tickets.update.mockResolvedValue({ ...ticket, status: "checked_in", checked_in_at: new Date() } as never);
+    prismaMock.$queryRaw.mockResolvedValue((found ? [{ id: 21n }] : []) as never);
+    if (found) prismaMock.tickets.findUniqueOrThrow.mockResolvedValue(found as never);
+  };
+
+  it("checks in a valid QR token, records the officer, and never creates a new ticket", async () => {
+    lockTicket(ticket);
+    prismaMock.tickets.update.mockResolvedValue({ ...ticket, status: "checked_in", checked_in_at: new Date(), checked_in_by: 2n } as never);
     const repository = new CheckInRepository(checkInRules);
 
-    const result = await repository.checkIn(4n, "valid-token", 2n);
+    const result = await repository.checkIn(window, "valid-token", 2n);
 
     expect(result.reason).toBe("ok");
-    expect(prismaMock.tickets.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 21n } }));
-    expect(prismaMock.ticket_scans.create).toHaveBeenCalledWith({ data: { ticket_id: 21n, scanned_by: 2n, scan_result: "success" } });
+    expect(prismaMock.tickets.update).toHaveBeenCalledWith({
+      where: { id: 21n },
+      data: { status: "checked_in", checked_in_at: expect.any(Date), checked_in_by: 2n },
+    });
+    expect(prismaMock.ticket_scans.create).toHaveBeenCalledWith({ data: { ticket_id: 21n, scanned_by: 2n, event_id: 4n, scan_result: "success" } });
+    expect(prismaMock.audit_logs.create).toHaveBeenCalled();
     expect(prismaMock.tickets.create).not.toHaveBeenCalled();
     expect(prismaMock.tickets.createMany).not.toHaveBeenCalled();
   });
 
-  it("records a duplicate scan when the same QR is scanned again", async () => {
-    runTransactionsOnMock();
-    prismaMock.$queryRaw.mockResolvedValue([{ id: 21n }] as never);
-    prismaMock.tickets.findUniqueOrThrow.mockResolvedValue({ ...ticket, status: "checked_in" } as never);
+  it.each([
+    ["duplicate", { ...ticket, status: "checked_in" }, "duplicate"],
+    ["unpaid", { ...ticket, order: { status: "pending" } }, "invalid"],
+    ["wrong_event", { ...ticket, ticketType: { event_id: 5n, name: "VIP" } }, "invalid"],
+  ])("does not change the ticket when validation fails (%s) but still logs the scan", async (reason, found, scanResult) => {
+    lockTicket(found);
     const repository = new CheckInRepository(checkInRules);
 
-    await expect(repository.checkIn(4n, "valid-token", 2n)).resolves.toMatchObject({ reason: "duplicate" });
+    await expect(repository.checkIn(window, "valid-token", 2n)).resolves.toMatchObject({ reason });
     expect(prismaMock.tickets.update).not.toHaveBeenCalled();
-    expect(prismaMock.ticket_scans.create).toHaveBeenCalledWith({ data: { ticket_id: 21n, scanned_by: 2n, scan_result: "duplicate" } });
+    expect(prismaMock.audit_logs.create).not.toHaveBeenCalled();
+    expect(prismaMock.ticket_scans.create).toHaveBeenCalledWith({ data: { ticket_id: 21n, scanned_by: 2n, event_id: 4n, scan_result: scanResult } });
   });
 
   it("returns not_found for an unknown token without writing anything", async () => {
-    runTransactionsOnMock();
-    prismaMock.$queryRaw.mockResolvedValue([] as never);
+    lockTicket(null);
     const repository = new CheckInRepository(checkInRules);
 
-    await expect(repository.checkIn(4n, "unknown-token", 2n)).resolves.toEqual({ reason: "not_found" });
+    await expect(repository.checkIn(window, "unknown-token", 2n)).resolves.toEqual({ reason: "not_found" });
     expect(prismaMock.ticket_scans.create).not.toHaveBeenCalled();
+    expect(prismaMock.tickets.update).not.toHaveBeenCalled();
   });
 
-  const event = { id: 4n, organizer: { user_id: 7n, status: "verified" } };
+  it("classifies every scan condition", () => {
+    const now = new Date();
+    const verify = (overrides: object, at = now) => checkInRules.verify({ ...ticket, ...overrides } as never, window, at);
 
-  it("returns USED for a valid QR scanned by the event organizer", async () => {
+    expect(verify({})).toBe("ok");
+    expect(verify({ ticketType: { event_id: 5n } })).toBe("wrong_event");
+    expect(verify({}, new Date(now.getTime() - 2 * hour))).toBe("not_open");
+    expect(verify({}, new Date(now.getTime() + 2 * hour))).toBe("closed");
+    expect(verify({ order: { status: "pending" } })).toBe("unpaid");
+    expect(verify({ status: "cancelled" })).toBe("cancelled");
+    expect(verify({ status: "expired" })).toBe("expired");
+    expect(verify({ status: "checked_in" })).toBe("duplicate");
+  });
+
+  const event = {
+    id: 4n,
+    gate_open_at: window.opensAt,
+    start_at: window.opensAt,
+    end_at: window.closesAt,
+    organizer: { user_id: 7n, status: "verified" },
+  };
+  const serviceFor = (reason: string, foundEvent: object | null = event) => {
     const repository = {
-      findEvent: vi.fn().mockResolvedValue(event),
-      checkIn: vi.fn().mockResolvedValue({ reason: "ok", ticket: { ...ticket, status: "checked_in", checked_in_at: new Date() } }),
+      findEvent: vi.fn().mockResolvedValue(foundEvent),
+      checkIn: vi.fn().mockResolvedValue({ reason, ticket: { ...ticket, status: "checked_in", checked_in_at: new Date(), checked_in_by: 7n } }),
     };
-    const service = new CheckInService(repository as never);
+    return { repository, service: new CheckInService(repository as never) };
+  };
+  const input = { event_id: 4n, qr_token: "valid-token" };
 
-    await expect(service.checkIn(7n, "organizer", { event_id: 4n, qr_token: "valid-token" })).resolves.toMatchObject({ ticket_code: "TCK-1", status: "USED" });
+  it("returns USED with officer and time for a valid QR scanned by the event organizer", async () => {
+    const { repository, service } = serviceFor("ok");
+
+    await expect(service.checkIn(7n, "organizer", input)).resolves.toMatchObject({ ticket_code: "TCK-1", status: "USED", checked_in_by: 7n });
+    expect(repository.checkIn).toHaveBeenCalledWith({ eventId: 4n, opensAt: window.opensAt, closesAt: window.closesAt }, "valid-token", 7n);
   });
 
-  it("rejects an unknown token, a reused token, and another organizer's event", async () => {
-    const service = (reason: string) =>
-      new CheckInService({ findEvent: vi.fn().mockResolvedValue(event), checkIn: vi.fn().mockResolvedValue({ reason, ticket }) } as never);
+  it("opens check-in at start_at when the event has no gate_open_at", async () => {
+    const { repository, service } = serviceFor("ok", { ...event, gate_open_at: null });
 
-    await expect(service("not_found").checkIn(7n, "organizer", { event_id: 4n, qr_token: "unknown" })).rejects.toBeInstanceOf(NotFoundError);
-    await expect(service("duplicate").checkIn(7n, "organizer", { event_id: 4n, qr_token: "used" })).rejects.toBeInstanceOf(ConflictError);
-    await expect(service("ok").checkIn(99n, "organizer", { event_id: 4n, qr_token: "valid" })).rejects.toBeInstanceOf(ForbiddenError);
+    await service.checkIn(2n, "admin", input);
+    expect(repository.checkIn.mock.calls[0][0]).toMatchObject({ opensAt: event.start_at });
   });
 
-  it("validates event, payment, and usage of a scanned ticket", () => {
-    expect(checkInRules.verify(ticket as never, 4n)).toBe("ok");
-    expect(checkInRules.verify(ticket as never, 5n)).toBe("wrong_event");
-    expect(checkInRules.verify({ ...ticket, order: { status: "pending" } } as never, 4n)).toBe("invalid");
-    expect(checkInRules.verify({ ...ticket, status: "cancelled" } as never, 4n)).toBe("invalid");
-    expect(checkInRules.verify({ ...ticket, status: "checked_in" } as never, 4n)).toBe("duplicate");
+  it.each([
+    ["not_found", 404, "TICKET_NOT_FOUND"],
+    ["wrong_event", 409, "WRONG_EVENT"],
+    ["not_open", 409, "CHECKIN_NOT_OPEN"],
+    ["closed", 409, "CHECKIN_CLOSED"],
+    ["unpaid", 409, "TICKET_UNPAID"],
+    ["cancelled", 409, "TICKET_CANCELLED"],
+    ["expired", 409, "TICKET_EXPIRED"],
+    ["duplicate", 409, "TICKET_USED"],
+  ])("maps %s to HTTP %i with code %s", async (reason, statusCode, code) => {
+    const { service } = serviceFor(reason);
+
+    await expect(service.checkIn(7n, "organizer", input)).rejects.toMatchObject({ statusCode, code });
+  });
+
+  it("rejects unauthorized officers and unknown events before scanning", async () => {
+    const other = serviceFor("ok");
+    const unverified = serviceFor("ok", { ...event, organizer: { user_id: 7n, status: "suspended" } });
+    const missing = serviceFor("ok", null);
+
+    await expect(other.service.checkIn(99n, "organizer", input)).rejects.toMatchObject({ statusCode: 403, code: "CHECKIN_FORBIDDEN" });
+    await expect(unverified.service.checkIn(7n, "organizer", input)).rejects.toMatchObject({ statusCode: 403, code: "CHECKIN_FORBIDDEN" });
+    await expect(missing.service.checkIn(7n, "organizer", input)).rejects.toMatchObject({ statusCode: 404, code: "EVENT_NOT_FOUND" });
+    expect(other.repository.checkIn).not.toHaveBeenCalled();
   });
 });
 

@@ -238,7 +238,21 @@ E-ticket diterbitkan otomatis saat pembayaran terverifikasi: satu record per uni
 
 | Method | Endpoint | Keterangan |
 |--------|----------|------------|
-| `POST` | `/api/v1/check-in` | (organizer pemilik event yang `verified`, atau admin) body `event_id`, `qr_token`. Sukses → status tiket `USED`. Token tidak dikenal `404`; tiket sudah dipakai / bukan untuk event ini / dibatalkan / order belum paid `409`. Setiap scan dicatat di `ticket_scans` |
+| `POST` | `/api/v1/check-in` | (organizer pemilik event yang `verified`, atau admin) body `event_id`, `qr_token`. Sukses → status tiket `USED`, menyimpan `checked_in_at` dan `checked_in_by` |
+
+Jendela check-in dimulai dari `gate_open_at` (atau `start_at` bila kosong) sampai `end_at` event. Validasi gagal tidak mengubah status tiket. Setiap scan dicatat di `ticket_scans` beserta petugas, waktu, event, dan hasilnya.
+
+| HTTP | `code` | Kondisi |
+|------|--------|---------|
+| `400` | `VALIDATION_ERROR` | Body tidak valid atau format QR salah |
+| `403` | `CHECKIN_FORBIDDEN` | Bukan organizer pemilik event, atau organizer belum `verified` |
+| `404` | `EVENT_NOT_FOUND` | Event tidak ditemukan |
+| `404` | `TICKET_NOT_FOUND` | Token QR tidak dikenal |
+| `409` | `WRONG_EVENT` | Tiket untuk event lain |
+| `409` | `CHECKIN_NOT_OPEN` / `CHECKIN_CLOSED` | Di luar jendela check-in |
+| `409` | `TICKET_UNPAID` | Order belum dibayar |
+| `409` | `TICKET_CANCELLED` / `TICKET_EXPIRED` | Tiket dibatalkan atau kadaluarsa |
+| `409` | `TICKET_USED` | Tiket sudah dipakai |
 
 ### Admin
 
@@ -290,6 +304,13 @@ npm run test:coverage
 Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock Prisma; test HTTP memock singleton Prisma sehingga tidak membutuhkan database atau layanan eksternal. Helper `tests/helpers/prisma.mock.ts` tersedia untuk test repository/unit yang membutuhkan Prisma mock dengan reset otomatis.
 
 ## 📝 Changelog
+
+### 2026-11-24 — Check-in lengkap
+- Error code spesifik per kondisi scan: `TICKET_NOT_FOUND`, `WRONG_EVENT`, `CHECKIN_NOT_OPEN`, `CHECKIN_CLOSED`, `TICKET_UNPAID`, `TICKET_CANCELLED`, `TICKET_EXPIRED`, `TICKET_USED`, `CHECKIN_FORBIDDEN`, `EVENT_NOT_FOUND`.
+- Jendela check-in: `gate_open_at` (atau `start_at`) sampai `end_at` event.
+- Format `qr_token` divalidasi (43 karakter base64url) sebelum menyentuh database.
+- Migrasi `20261124120000_add_checkin_audit`: kolom `tickets.checked_in_by` dan `ticket_scans.event_id`.
+- Test untuk setiap kondisi scan, termasuk bahwa validasi gagal tidak mengubah status tiket.
 
 ### 2026-11-24 — E-ticket, QR, dan check-in
 - E-ticket diterbitkan saat order menjadi PAID: satu record per unit, `ticket_code` (UUID acak) dan `qr_token` (32 byte acak) unik. Tabel `tickets` kini berelasi langsung ke `orders` dan `ticket_types`, dengan kolom `sequence` dan constraint unik `(order_item_id, sequence)`; penerbitan memakai `skipDuplicates` sehingga webhook yang diproses ulang tidak menambah tiket.

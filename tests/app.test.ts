@@ -270,10 +270,18 @@ describe("HTTP routes", () => {
     prismaMock.users.findUnique.mockResolvedValueOnce(admin);
     const adminTickets = await request(app).get("/api/v1/me/tickets").set("Authorization", `Bearer ${tokenFor(2n)}`);
     prismaMock.users.findUnique.mockResolvedValueOnce(buyer);
-    const buyerCheckIn = await request(app).post("/api/v1/check-in").set("Authorization", `Bearer ${tokenFor(1n)}`).send({ event_id: "1", qr_token: "x" });
+    const buyerCheckIn = await request(app).post("/api/v1/check-in").set("Authorization", `Bearer ${tokenFor(1n)}`).send({ event_id: "1", qr_token: "a".repeat(43) });
     const anonymous = await request(app).get("/api/v1/me/tickets/1");
 
     expect([adminTickets.status, buyerCheckIn.status, anonymous.status]).toEqual([403, 403, 401]);
+  });
+
+  it("rejects a malformed QR token before checking in", async () => {
+    prismaMock.users.findUnique.mockResolvedValueOnce(admin);
+    const response = await request(app).post("/api/v1/check-in").set("Authorization", `Bearer ${tokenFor(2n)}`).send({ event_id: "1", qr_token: "not a token" });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({ code: "VALIDATION_ERROR", errors: [{ field: "qr_token", message: "Format QR tidak valid" }] });
   });
 
   it("reports health with database status", async () => {

@@ -3,7 +3,21 @@ export type CheckInInput = {
   qr_token: string;
 };
 
-export type CheckInReason = "ok" | "wrong_event" | "invalid" | "duplicate";
+export type CheckInReason =
+  | "ok"
+  | "wrong_event"
+  | "not_open"
+  | "closed"
+  | "unpaid"
+  | "cancelled"
+  | "expired"
+  | "duplicate";
+
+export type CheckInWindow = {
+  eventId: bigint;
+  opensAt: Date;
+  closesAt: Date;
+};
 
 export type ScannableTicket = {
   status: "issued" | "checked_in" | "cancelled" | "expired";
@@ -13,5 +27,5 @@ export type ScannableTicket = {
 
 // Aturan validasi dimiliki service; repository memanggilnya di dalam transaksi setelah tiket di-lock.
 export type CheckInRules = {
-  verify(ticket: ScannableTicket, eventId: bigint): CheckInReason;
+  verify(ticket: ScannableTicket, window: CheckInWindow, now: Date): CheckInReason;
 };

@@ -1,6 +1,6 @@
 import { prisma } from "../../lib/prisma.js";
 import { Prisma } from "../../generated/prisma/client.js";
-import type { CheckInRules } from "./check-in.types.js";
+import type { CheckInRules, CheckInWindow } from "./check-in.types.js";
 
 export class CheckInRepository {
   constructor(private readonly rules: CheckInRules) {}
@@ -8,11 +8,17 @@ export class CheckInRepository {
   async findEvent(eventId: bigint) {
     return prisma.events.findUnique({
       where: { id: eventId },
-      select: { id: true, organizer: { select: { user_id: true, status: true } } },
+      select: {
+        id: true,
+        gate_open_at: true,
+        start_at: true,
+        end_at: true,
+        organizer: { select: { user_id: true, status: true } },
+      },
     });
   }
 
-  async checkIn(eventId: bigint, qrToken: string, scannerId: bigint) {
+  async checkIn(window: CheckInWindow, qrToken: string, scannerId: bigint) {
     return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Lock baris tiket agar dua scan bersamaan tidak sama-sama lolos.
       const [locked] = await tx.$queryRaw<{ id: bigint }[]>(
@@ -28,12 +34,13 @@ export class CheckInRepository {
         },
       });
 
-      const reason = this.rules.verify(ticket, eventId);
+      const now = new Date();
+      const reason = this.rules.verify(ticket, window, now);
       const checkedIn =
         reason === "ok"
           ? await tx.tickets.update({
               where: { id: ticket.id },
-              data: { status: "checked_in", checked_in_at: new Date() },
+              data: { status: "checked_in", checked_in_at: now, checked_in_by: scannerId },
             })
           : null;
 
@@ -41,6 +48,7 @@ export class CheckInRepository {
         data: {
           ticket_id: ticket.id,
           scanned_by: scannerId,
+          event_id: window.eventId,
           scan_result: reason === "ok" ? "success" : reason === "duplicate" ? "duplicate" : "invalid",
         },
       });
@@ -53,7 +61,11 @@ export class CheckInRepository {
             table_name: "tickets",
             record_id: ticket.id,
             old_data: { status: ticket.status },
-            new_data: { status: checkedIn.status, checked_in_at: checkedIn.checked_in_at },
+            new_data: {
+              status: checkedIn.status,
+              checked_in_at: checkedIn.checked_in_at,
+              checked_in_by: scannerId.toString(),
+            },
           },
         });
       }

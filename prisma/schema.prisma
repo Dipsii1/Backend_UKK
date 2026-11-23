@@ -175,7 +175,8 @@ model users {
   carts              carts[]
   orders             orders[]
   voucherUsages      voucher_usages[]
-  tickets            tickets[]
+  tickets            tickets[]             @relation("ticketOwner")
+  checkedInTickets   tickets[]             @relation("ticketCheckedInBy")
   ticketScans        ticket_scans[]
   notifications      notifications[]
   auditLogs          audit_logs[]
@@ -390,6 +391,7 @@ model events {
   socials        event_socials[]
   sponsors       event_sponsors[]
   checkinDevices event_checkin_devices[]
+  ticketScans    ticket_scans[]
   eventTags      event_tags[]
   ticketTypes    ticket_types[]
 
@@ -825,20 +827,23 @@ model tickets {
 
   status        TicketStatus @default(issued)
   checked_in_at DateTime?
+  checked_in_by BigInt?
 
   created_at DateTime  @default(now())
   updated_at DateTime? @updatedAt
 
-  order      orders         @relation(fields: [order_id], references: [id])
-  orderItem  order_items    @relation(fields: [order_item_id], references: [id])
-  ticketType ticket_types   @relation(fields: [ticket_type_id], references: [id])
-  owner      users          @relation(fields: [owner_id], references: [id])
-  scans      ticket_scans[]
+  order       orders         @relation(fields: [order_id], references: [id])
+  orderItem   order_items    @relation(fields: [order_item_id], references: [id])
+  ticketType  ticket_types   @relation(fields: [ticket_type_id], references: [id])
+  owner       users          @relation("ticketOwner", fields: [owner_id], references: [id])
+  checkedInBy users?         @relation("ticketCheckedInBy", fields: [checked_in_by], references: [id], onDelete: SetNull)
+  scans       ticket_scans[]
 
   @@unique([order_item_id, sequence])
   @@index([order_id])
   @@index([ticket_type_id])
   @@index([order_item_id])
+  @@index([checked_in_by])
   @@index([owner_id])
   @@index([status])
 }
@@ -848,6 +853,8 @@ model ticket_scans {
 
   ticket_id  BigInt
   scanned_by BigInt
+  // Event tempat scan dilakukan (bisa berbeda dari event tiket bila ditolak sebagai event tidak sesuai).
+  event_id   BigInt?
 
   gate        String?
   device      String?
@@ -857,9 +864,11 @@ model ticket_scans {
 
   ticket  tickets @relation(fields: [ticket_id], references: [id])
   scanner users   @relation(fields: [scanned_by], references: [id])
+  event   events? @relation(fields: [event_id], references: [id])
 
   @@index([ticket_id])
   @@index([scanned_by])
+  @@index([event_id])
 }
 
 // 
