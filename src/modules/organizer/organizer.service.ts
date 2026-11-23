@@ -117,7 +117,12 @@ export class OrganizerService {
 
   async createTicket(userId: bigint, data: TicketInput) {
     const event = await this.editableEvent(userId, data.event_id);
-    this.assertEditable(event.status);
+    // Event published boleh ditambah tiket gelombang baru selama event belum berakhir.
+    if (event.status === "published") {
+      if (event.end_at <= new Date()) throw new ConflictError("Festival sudah berakhir");
+    } else {
+      this.assertEditable(event.status);
+    }
     this.validateTicketDates(data);
     const status = data.quota === 0 ? "sold_out" : (data.status ?? "active");
     return this.organizerRepo.createTicket({ ...data, status });

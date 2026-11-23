@@ -31,6 +31,7 @@ export const ticketCreateSchema = z.object({
   price: z.coerce.number().nonnegative(),
   quota: z.coerce.number().int().nonnegative(),
   max_purchase: z.coerce.number().int().positive().max(100).optional(),
+  wave: z.coerce.number().int().positive().max(100).optional(),
   sale_start_at: optionalDate,
   sale_end_at: optionalDate,
   status: z.enum(["active", "sold_out", "inactive"]).optional(),

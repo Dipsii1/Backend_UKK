@@ -596,6 +596,9 @@ model ticket_types {
   sold         Int     @default(0)
   max_purchase Int     @default(5)
 
+  // Gelombang penjualan (1 = presale/gelombang pertama); jadwal jual per gelombang via sale_start_at/sale_end_at.
+  wave Int @default(1)
+
   sale_start_at DateTime?
   sale_end_at   DateTime?
 

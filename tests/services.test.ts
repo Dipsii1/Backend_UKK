@@ -51,6 +51,33 @@ describe("OrganizerService", () => {
     expect(repository.updateTicket).not.toHaveBeenCalled();
   });
 
+  it("allows adding a new ticket wave to a published festival", async () => {
+    const repository = {
+      findByOwnerId: vi.fn().mockResolvedValue({ id: 9n, status: "verified" }),
+      findEventByIdAndOrganizer: vi.fn().mockResolvedValue({ id: 3n, status: "published", end_at: new Date(Date.now() + 86_400_000), ticketTypes: [] }),
+      createTicket: vi.fn().mockResolvedValue({ id: 5n }),
+    };
+    const service = new OrganizerService(repository as never);
+
+    await service.createTicket(1n, { event_id: 3n, name: "Gelombang 2", price: 150000, quota: 50, wave: 2 });
+    expect(repository.createTicket).toHaveBeenCalledWith(expect.objectContaining({ wave: 2, status: "active" }));
+  });
+
+  it("rejects new tickets for a published festival that has ended or is under review", async () => {
+    const ended = { id: 3n, status: "published", end_at: new Date(Date.now() - 1000), ticketTypes: [] };
+    const repository = {
+      findByOwnerId: vi.fn().mockResolvedValue({ id: 9n, status: "verified" }),
+      findEventByIdAndOrganizer: vi.fn().mockResolvedValueOnce(ended).mockResolvedValueOnce({ ...ended, status: "pending_review" }),
+      createTicket: vi.fn(),
+    };
+    const service = new OrganizerService(repository as never);
+    const input = { event_id: 3n, name: "Gelombang 2", price: 150000, quota: 50, wave: 2 };
+
+    await expect(service.createTicket(1n, input)).rejects.toBeInstanceOf(ConflictError);
+    await expect(service.createTicket(1n, input)).rejects.toBeInstanceOf(ConflictError);
+    expect(repository.createTicket).not.toHaveBeenCalled();
+  });
+
   it("uses paid orders only when calculating festival sales", async () => {
     const repository = {
       findByOwnerId: vi.fn().mockResolvedValue({ id: 9n }),

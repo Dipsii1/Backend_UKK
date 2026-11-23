@@ -73,7 +73,7 @@ export class OrganizerRepository {
   async findTicketsByEvent(eventId: bigint, organizerId: bigint) {
     return prisma.ticket_types.findMany({
       where: { event_id: eventId, event: { organizer_id: organizerId } },
-      orderBy: { created_at: "asc" },
+      orderBy: [{ wave: "asc" }, { created_at: "asc" }],
     });
   }
 

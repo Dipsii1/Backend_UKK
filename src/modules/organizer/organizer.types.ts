@@ -24,6 +24,7 @@ export type TicketInput = {
   price: number;
   quota: number;
   max_purchase?: number;
+  wave?: number;
   sale_start_at?: Date;
   sale_end_at?: Date;
   status?: "active" | "sold_out" | "inactive";

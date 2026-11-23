@@ -18,6 +18,7 @@ export type TicketTypeOutput = {
   quota: number;
   sold: number;
   max_purchase: number;
+  wave: number;
   sale_start_at: Date | null;
   sale_end_at: Date | null;
   status: string;

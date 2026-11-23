@@ -64,6 +64,7 @@ const ticketTypeSchema = {
     quota: { type: "integer", example: 100 },
     sold: { type: "integer", example: 10 },
     max_purchase: { type: "integer", example: 5 },
+    wave: { type: "integer", example: 1 },
     sale_start_at: { type: "string", format: "date-time", nullable: true },
     sale_end_at: { type: "string", format: "date-time", nullable: true },
     status: { type: "string", example: "active" },

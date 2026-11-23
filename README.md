@@ -189,7 +189,9 @@ Postman Collection seluruh endpoint tersedia di [`postman/UKK_2026.postman_colle
 
 Semua endpoint berikut memerlukan JWT dengan role `organizer`; akses data juga dibatasi ke organizer pemilik festival. Operasi tulis (buat/ubah/hapus/ajukan) hanya untuk organizer berstatus `verified`.
 
-Alur status festival: `draft` → (`submit`) → `pending_review` → (admin approve) → `published`. Festival hanya bisa diubah, dihapus, atau ditambah tiketnya saat berstatus `draft`/`rejected`; setelah diajukan, tiket hanya boleh diubah kuota/statusnya (harga terkunci).
+Alur status festival: `draft` → (`submit`) → `pending_review` → (admin approve) → `published`. Festival hanya bisa diubah atau dihapus saat berstatus `draft`/`rejected`; setelah diajukan, tiket hanya boleh diubah kuota/statusnya (harga terkunci). Tiket bisa ditambah saat `draft`/`rejected`, dan juga saat `published` (selama festival belum berakhir) untuk membuka **gelombang** baru.
+
+**Gelombang tiket:** setiap tipe tiket punya field `wave` (default `1`) dan jadwal jual sendiri `sale_start_at`/`sale_end_at`. Cart hanya menjual tiket yang sedang dalam jadwal jualnya, sehingga gelombang berikutnya otomatis terbuka sesuai jadwal. Contoh: `{ "event_id": "1", "name": "Reguler", "wave": 2, "price": 150000, "quota": 200, "sale_start_at": "2026-12-01T00:00:00Z" }`. Daftar tiket diurutkan per gelombang.
 
 | Method | Path | Keterangan |
 |:------:|------|------------|
@@ -198,7 +200,7 @@ Alur status festival: `draft` → (`submit`) → `pending_review` → (admin app
 | `POST` | `/api/v1/organizer/event/:id/submit` | Ajukan festival `draft`/`rejected` (minimal satu tipe tiket) untuk direview admin |
 | `GET` | `/api/v1/organizer/event/:id/tickets` | Daftar tiket pada festival |
 | `GET` | `/api/v1/organizer/event/:id/sales` | Monitoring order paid, tiket terjual, pendapatan, dan kuota per tipe tiket |
-| `POST` | `/api/v1/organizer/tickets` | Buat tipe tiket dan kuota |
+| `POST` | `/api/v1/organizer/tickets` | Buat tipe tiket, kuota, dan gelombang (`wave`); bisa saat festival `published` |
 | `GET`, `PATCH`, `DELETE` | `/api/v1/organizer/tickets/:id` | CRUD tiket dan manajemen kuota; kuota tidak boleh kurang dari penjualan |
 
 ### Cart
@@ -304,6 +306,11 @@ npm run test:coverage
 Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock Prisma; test HTTP memock singleton Prisma sehingga tidak membutuhkan database atau layanan eksternal. Helper `tests/helpers/prisma.mock.ts` tersedia untuk test repository/unit yang membutuhkan Prisma mock dengan reset otomatis.
 
 ## 📝 Changelog
+
+### 2026-11-25 — Gelombang tiket
+- Field baru `ticket_types.wave` (default `1`); migrasi `20261125090000_add_ticket_wave`.
+- `POST /organizer/tickets` kini bisa dipakai saat festival `published` (selama belum berakhir) untuk menambah gelombang baru; saat `pending_review` tetap ditolak. Hapus tiket dan ubah harga tetap hanya saat `draft`/`rejected`.
+- `wave` ditampilkan di endpoint event publik dan daftar tiket organizer, diurutkan per gelombang. Swagger body tiket kini mencantumkan `wave`, `sale_start_at`, `sale_end_at`.
 
 ### 2026-11-24 — Check-in lengkap
 - Error code spesifik per kondisi scan: `TICKET_NOT_FOUND`, `WRONG_EVENT`, `CHECKIN_NOT_OPEN`, `CHECKIN_CLOSED`, `TICKET_UNPAID`, `TICKET_CANCELLED`, `TICKET_EXPIRED`, `TICKET_USED`, `CHECKIN_FORBIDDEN`, `EVENT_NOT_FOUND`.
