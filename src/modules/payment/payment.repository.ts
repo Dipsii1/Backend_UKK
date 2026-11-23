@@ -55,6 +55,10 @@ export class PaymentRepository {
     await prisma.payment_logs.create({ data: { payment_id: paymentId, payload: asJson(payload) } });
   }
 
+  async findSeatIdsByOrder(orderId: bigint) {
+    return prisma.seat_reservations.findMany({ where: { order_id: orderId }, select: { seat_id: true, seat: { select: { seat_map_id: true, status: true } } } });
+  }
+
   async applyNotification(
     payment: { id: bigint; order_id: bigint },
     payload: MidtransNotification,
@@ -66,6 +70,7 @@ export class PaymentRepository {
         where: { order_id: payment.order_id },
         select: { id: true, ticket_type_id: true, quantity: true },
       });
+      const reservedSeats = (await tx.seat_reservations.findMany({ where: { order_id: payment.order_id }, select: { seat_id: true, seat: { select: { ticket_type_id: true } } }, orderBy: { seat_id: "asc" } })) ?? [];
       // Urutan lock sama dengan cart (ticket_types lalu orders) agar tidak deadlock.
       const ticketTypeIds = [...new Set(items.map((item) => item.ticket_type_id))].sort((a, b) => Number(a - b));
       for (const ticketTypeId of ticketTypeIds) await lockTicketType(tx, ticketTypeId);
@@ -120,6 +125,14 @@ export class PaymentRepository {
 
         await tx.orders.update({ where: { id: order.id }, data: { status: "paid" } });
         // Satu tiket per unit; (order_item_id, sequence) unik sehingga penerbitan ulang tidak menambah record.
+        const seatsByTicketType = new Map<bigint, bigint[]>();
+        for (const reservation of reservedSeats) {
+          if (reservation.seat.ticket_type_id) {
+            const bucket = seatsByTicketType.get(reservation.seat.ticket_type_id) ?? [];
+            bucket.push(reservation.seat_id);
+            seatsByTicketType.set(reservation.seat.ticket_type_id, bucket);
+          }
+        }
         const tickets = items.flatMap((item) =>
           Array.from({ length: item.quantity }, (_, index) => ({
             order_id: order.id,
@@ -129,9 +142,11 @@ export class PaymentRepository {
             sequence: index + 1,
             ticket_code: `TCK-${randomUUID()}`,
             qr_token: randomBytes(32).toString("base64url"),
+            seat_id: seatsByTicketType.get(item.ticket_type_id)?.shift(),
           })),
         );
         await tx.tickets.createMany({ data: tickets, skipDuplicates: true });
+        if (reservedSeats.length) await tx.seats.updateMany({ where: { id: { in: reservedSeats.map((seat) => seat.seat_id) } }, data: { status: "sold" } });
         await tx.audit_logs.create({
           data: {
             user_id: order.user_id,

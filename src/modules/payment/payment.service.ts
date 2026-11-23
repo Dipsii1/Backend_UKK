@@ -1,6 +1,6 @@
 import { PaymentRepository } from "./payment.repository.js";
 import { midtrans } from "../../utils/midtrans.js";
-import { emitToUser } from "../../lib/socket.js";
+import { emitToAll, emitToUser } from "../../lib/socket.js";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../../utils/app-error.js";
 import type { MidtransNotification, PaymentRules, PaymentStatusValue, PaymentTarget } from "./payment.types.js";
 
@@ -130,6 +130,12 @@ export class PaymentService {
         order_status: target.order,
         payment_status: target.payment,
       });
+      if (["paid", "expired", "cancelled"].includes(target.order) && typeof (this.paymentRepo as Partial<PaymentRepository>).findSeatIdsByOrder === "function") {
+        const seats = (await this.paymentRepo.findSeatIdsByOrder(payment.order_id)) ?? [];
+        const byMap = new Map<bigint, typeof seats>();
+        for (const seat of seats) byMap.set(seat.seat.seat_map_id, [...(byMap.get(seat.seat.seat_map_id) ?? []), seat]);
+        for (const [seatMapId, items] of byMap) emitToAll("seat:status-changed", { seat_map_id: seatMapId, seats: items.map((seat) => ({ id: seat.seat_id, status: seat.seat.status })) });
+      }
     }
     return { result };
   }

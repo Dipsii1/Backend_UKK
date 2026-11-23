@@ -10,6 +10,7 @@ import { healthPaths } from "./swagger/health.paths.js";
 import { paymentPaths } from "./swagger/payment.paths.js";
 import { ticketPaths } from "./swagger/ticket.paths.js";
 import { notificationPaths } from "./swagger/notification.paths.js";
+import { seatMapPaths } from "./swagger/seat-map.paths.js";
 
 const swaggerDocument = {
   openapi: "3.0.0",
@@ -26,8 +27,9 @@ const swaggerDocument = {
     { name: "Payments", description: "Pembayaran Midtrans Snap dan webhook notifikasi" },
     { name: "Tickets", description: "E-ticket milik buyer beserta QR" },
     { name: "Check-in", description: "Scan dan validasi QR e-ticket" },
+    { name: "Seat maps", description: "Denah kursi organizer dan reservasi kursi buyer" },
   ],
-  paths: { ...healthPaths, ...authPaths, ...usersPaths, ...eventPaths, ...organizerPaths, ...adminPaths, ...cartPaths, ...paymentPaths, ...ticketPaths, ...notificationPaths },
+  paths: { ...healthPaths, ...authPaths, ...usersPaths, ...eventPaths, ...organizerPaths, ...adminPaths, ...cartPaths, ...paymentPaths, ...ticketPaths, ...notificationPaths, ...seatMapPaths },
   components: {
     securitySchemes: {
       bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },

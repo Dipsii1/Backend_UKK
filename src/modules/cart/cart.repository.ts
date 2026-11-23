@@ -48,6 +48,11 @@ export async function releasePendingOrder(
 
   // Voucher dari order yang batal/kadaluarsa dikembalikan agar bisa dipakai lagi.
   await tx.voucher_usages.deleteMany({ where: { order_id: order.id } });
+  const reservedSeats = (await tx.seat_reservations.findMany({ where: { order_id: order.id }, select: { seat_id: true } })) ?? [];
+  if (reservedSeats.length) {
+    await tx.seats.updateMany({ where: { id: { in: reservedSeats.map((seat) => seat.seat_id) }, status: "held" }, data: { status: "available" } });
+    await tx.seat_reservations.deleteMany({ where: { order_id: order.id } });
+  }
 
   await tx.audit_logs.create({
     data: {
@@ -228,6 +233,14 @@ export class CartRepository {
     return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const cart = await tx.carts.findUnique({ where: { user_id: userId } });
       if (!cart) return false;
+      const reservedSeats = await tx.seat_reservations.findMany({
+        where: { cart_id: cart.id, seat: { ticket_type_id: ticketTypeId } },
+        select: { seat_id: true },
+      });
+      if (reservedSeats.length) {
+        await tx.seats.updateMany({ where: { id: { in: reservedSeats.map((seat) => seat.seat_id) }, status: "held" }, data: { status: "available" } });
+        await tx.seat_reservations.deleteMany({ where: { seat_id: { in: reservedSeats.map((seat) => seat.seat_id) } } });
+      }
       const deleted = await tx.cart_items.deleteMany({ where: { cart_id: cart.id, ticket_type_id: ticketTypeId } });
       await tx.ticket_locks.deleteMany({ where: { cart_id: cart.id, ticket_type_id: ticketTypeId } });
       return deleted.count > 0;
@@ -248,10 +261,15 @@ export class CartRepository {
             },
           },
           locks: true,
+          seatReservations: { include: { seat: { select: { ticket_type_id: true, status: true } } } },
         },
       });
 
       if (!cart || cart.items.length === 0) return { reason: "empty" as const };
+
+      if ((cart.seatReservations ?? []).some((reservation) => reservation.expires_at === null || reservation.expires_at <= now || reservation.seat.status !== "held")) {
+        return { reason: "lock_expired" as const };
+      }
 
       const activeLocks = new Map(
         cart.locks
@@ -364,6 +382,11 @@ export class CartRepository {
           record_id: order.id,
           new_data: { status: order.status, ...totals },
         },
+      });
+
+      await tx.seat_reservations.updateMany({
+        where: { cart_id: cart.id },
+        data: { cart_id: null, order_id: order.id, expires_at: null },
       });
 
       await tx.cart_items.deleteMany({ where: { cart_id: cart.id } });

@@ -23,6 +23,9 @@ import notificationRouter from "./modules/notification/notification.route.js";
 import { initSocket } from "./lib/socket.js";
 import { CartRepository } from "./modules/cart/cart.repository.js";
 import { CartService, cartRules } from "./modules/cart/cart.service.js";
+import seatMapRouter from "./modules/seat-map/seat-map.route.js";
+import { SeatMapRepository } from "./modules/seat-map/seat-map.repository.js";
+import { SeatMapService } from "./modules/seat-map/seat-map.service.js";
 
 const app = express();
 
@@ -48,6 +51,7 @@ app.use("/api/v1/payments", paymentRouter);
 app.use("/api/v1/me/tickets", ticketRouter);
 app.use("/api/v1/check-in", checkInRouter);
 app.use("/api/v1/notifications", notificationRouter);
+app.use("/api/v1", seatMapRouter);
 
 setupSwagger(app);
 app.use(notFoundHandler);
@@ -66,8 +70,10 @@ if (isEntryPoint) {
 
     // shortcut: interval per proses, cukup untuk satu instance; pindah ke satu worker/cron bila server di-scale horizontal.
     const cartService = new CartService(new CartRepository(cartRules));
+    const seatMapService = new SeatMapService(new SeatMapRepository());
     setInterval(() => {
       cartService.expireStaleOrders().catch((error) => console.error("Gagal melepas order kadaluarsa:", error));
+      seatMapService.expireStaleReservations().catch((error) => console.error("Gagal melepas hold kursi:", error));
     }, 60_000);
   });
 }

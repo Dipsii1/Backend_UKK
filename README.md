@@ -340,6 +340,15 @@ Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock 
 
 ## 📝 Changelog
 
+### 2026-11-23 — Konsistensi modul seat map
+- Menyelaraskan struktur modul `seat-map` dengan modul lain: tipe input dipindah ke `seat-map.types.ts`, controller memisahkan parsing parameter, route dikelompokkan menjadi viewer publik, organizer, serta buyer, dan seluruh query/transaksi `SeatMapRepository`, schema validation, serta Swagger ditulis multiline dengan gaya yang seragam. Tidak ada perubahan kontrak API atau perilaku.
+
+### 2026-11-23 — Seat map & reservasi kursi
+- Menambahkan denah kursi terstruktur (`seat_maps`, `seat_sections`, `seats`, dan `seat_reservations`) melalui migrasi `20261123093000_add_seat_maps`. Frontend menerima primitive geometri, sehingga React-Konva dapat mengedit dan SVG dapat menampilkan denah tanpa menyimpan SVG markup di database.
+- Organizer dapat mengambil dan menyimpan denah pada `GET`/`PUT /api/v1/organizer/event/:id/seat-map` saat event masih `draft`/`rejected`. Viewer publik menggunakan `GET /api/v1/events/:id/seat-map`; parameter viewport `x`, `y`, `width`, `height` membatasi kursi yang dikirim untuk culling.
+- Buyer menahan kursi lewat `POST /api/v1/seat-maps/:id/reservations`. Hold berlaku **5 menit**, atomik dengan transaksi PostgreSQL Serializable dan row lock, menambah tipe tiket terkait ke cart, dan otomatis dilepas oleh job satu-menit.
+- Checkout memindahkan reservasi kursi ke order; settlement Midtrans menandai kursi `sold` dan mengaitkannya ke e-ticket. Perubahan status memancarkan event Socket.IO `seat:status-changed` berisi delta status saja.
+
 ### 2026-11-26 — Perbaikan hasil audit
 - Halaman `GET /auth/reset-password` kini menolak parameter `token` ganda (`?token=a&token=b`) dengan `400`, sebelumnya crash `500`.
 - Peta error lama berbasis `error.message` (`EMAIL_EXISTS`, dll.) di error handler dihapus karena tidak lagi dipakai; semua error domain memakai `AppError`.
