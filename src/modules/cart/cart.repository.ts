@@ -157,6 +157,15 @@ export class CartRepository {
       if (!ticket) return { reason: "not_found" as const };
       if (!this.rules.isSellable(ticket, now)) return { reason: "unavailable" as const };
 
+      const previousWaves = await tx.ticket_types.findMany({
+        where: {
+          event_id: ticket.event_id,
+          wave: { lt: ticket.wave },
+        },
+        select: { status: true, quota: true, sold: true, sale_end_at: true },
+      });
+      if (!this.rules.isWaveOpen(previousWaves, now)) return { reason: "wave_locked" as const };
+
       const purchased = await this.purchasedQuantity(tx, userId, ticketTypeId);
       if (purchased + quantity > ticket.max_purchase) {
         return { reason: "max_purchase" as const, maxPurchase: ticket.max_purchase };

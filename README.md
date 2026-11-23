@@ -191,7 +191,7 @@ Semua endpoint berikut memerlukan JWT dengan role `organizer`; akses data juga d
 
 Alur status festival: `draft` → (`submit`) → `pending_review` → (admin approve) → `published`. Festival hanya bisa diubah atau dihapus saat berstatus `draft`/`rejected`; setelah diajukan, tiket hanya boleh diubah kuota/statusnya (harga terkunci). Tiket bisa ditambah saat `draft`/`rejected`, dan juga saat `published` (selama festival belum berakhir) untuk membuka **gelombang** baru.
 
-**Gelombang tiket:** setiap tipe tiket punya field `wave` (default `1`) dan jadwal jual sendiri `sale_start_at`/`sale_end_at`. Cart hanya menjual tiket yang sedang dalam jadwal jualnya, sehingga gelombang berikutnya otomatis terbuka sesuai jadwal. Contoh: `{ "event_id": "1", "name": "Reguler", "wave": 2, "price": 150000, "quota": 200, "sale_start_at": "2026-12-01T00:00:00Z" }`. Daftar tiket diurutkan per gelombang.
+**Gelombang tiket:** setiap tipe tiket punya field `wave` (default `1`) dan jadwal jual sendiri `sale_start_at`/`sale_end_at`. Gelombang berikutnya otomatis terbuka saat **semua** tipe tiket gelombang sebelumnya di festival yang sama habis (`sold >= quota`), nonaktif, atau jadwal jualnya lewat — dan tetap harus berada dalam jadwal jualnya sendiri. Sebelum itu, `PUT` item cart ke gelombang tersebut ditolak `409`. Contoh: `{ "event_id": "1", "name": "Reguler", "wave": 2, "price": 150000, "quota": 200, "sale_start_at": "2026-12-01T00:00:00Z" }`. Daftar tiket diurutkan per gelombang.
 
 | Method | Path | Keterangan |
 |:------:|------|------------|
@@ -306,6 +306,14 @@ npm run test:coverage
 Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock Prisma; test HTTP memock singleton Prisma sehingga tidak membutuhkan database atau layanan eksternal. Helper `tests/helpers/prisma.mock.ts` tersedia untuk test repository/unit yang membutuhkan Prisma mock dengan reset otomatis.
 
 ## 📝 Changelog
+
+### 2026-11-25 — Harga dalam format Rupiah
+- Helper `formatRupiah` di `src/utils/currency.ts` (`150000` → `"Rp 150.000"`, tanpa sen).
+- Field angka tetap dikirim; ditambah field teks: `price_formatted` pada tipe tiket di endpoint event publik, `unit_price_formatted`/`subtotal_formatted` per item dan `subtotal_formatted` pada cart, serta `subtotal_formatted`, `discount_formatted`, `service_fee_formatted`, `tax_formatted`, `total_formatted` pada response checkout.
+
+### 2026-11-25 — Gelombang otomatis
+- Tiket gelombang N baru bisa dimasukkan ke cart setelah semua tipe tiket gelombang < N di festival yang sama habis terjual, nonaktif, atau lewat `sale_end_at` (`cartRules.isWaveOpen`). Jika belum, cart menolak dengan `409` "Gelombang ini belum dibuka".
+- Pengecekan ada di transaksi Serializable saat menambah item cart; reservasi yang sudah ada tetap bisa di-checkout.
 
 ### 2026-11-25 — Gelombang tiket
 - Field baru `ticket_types.wave` (default `1`); migrasi `20261125090000_add_ticket_wave`.

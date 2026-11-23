@@ -1,6 +1,7 @@
 import { prisma } from "../../lib/prisma.js";
 import type { Prisma } from "../../generated/prisma/client.js";
 import type { EventQuery, EventListResult, EventDetail } from "./event.types.js";
+import { formatRupiah } from "../../utils/currency.js";
 
 const toNumber = (value: unknown): number => {
   if (value === null || value === undefined) return 0;
@@ -125,6 +126,7 @@ export class EventRepository {
         ticketTypes: (event.ticketTypes ?? []).map((t) => ({
           ...t,
           price: toNumber(t.price),
+          price_formatted: formatRupiah(t.price),
         })),
       })),
       total,
@@ -224,6 +226,7 @@ export class EventRepository {
       ticketTypes: event.ticketTypes.map((t) => ({
         ...t,
         price: toNumber(t.price),
+        price_formatted: formatRupiah(t.price),
       })),
     } as EventDetail;
   }

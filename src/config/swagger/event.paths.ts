@@ -61,6 +61,7 @@ const ticketTypeSchema = {
     name: { type: "string", example: "VIP" },
     description: { type: "string", nullable: true, example: "Tiket akses penuh" },
     price: { type: "number", example: 500000 },
+    price_formatted: { type: "string", example: "Rp 500.000" },
     quota: { type: "integer", example: 100 },
     sold: { type: "integer", example: 10 },
     max_purchase: { type: "integer", example: 5 },

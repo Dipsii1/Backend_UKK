@@ -3,6 +3,7 @@ import { CartRepository } from "./cart.repository.js";
 import { CartService, cartRules } from "./cart.service.js";
 import { sendSuccess } from "../../utils/api-response.js";
 import { asyncHandler } from "../../utils/async-handler.js";
+import { formatRupiah } from "../../utils/currency.js";
 
 const cartService = new CartService(new CartRepository(cartRules));
 
@@ -25,6 +26,18 @@ export class CartController {
 
   static checkout = asyncHandler(async (req: Request, res: Response) => {
     const order = await cartService.checkout(req.userId!, req.body);
-    sendSuccess(res, order, "Order berhasil dibuat", 201);
+    sendSuccess(
+      res,
+      {
+        ...order,
+        subtotal_formatted: formatRupiah(order.subtotal),
+        discount_formatted: formatRupiah(order.discount),
+        service_fee_formatted: formatRupiah(order.service_fee),
+        tax_formatted: formatRupiah(order.tax),
+        total_formatted: formatRupiah(order.total),
+      },
+      "Order berhasil dibuat",
+      201,
+    );
   });
 }

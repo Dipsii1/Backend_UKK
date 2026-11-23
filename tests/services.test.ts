@@ -12,6 +12,7 @@ import { CartService, cartRules } from "../src/modules/cart/cart.service.js";
 import { PaymentService, mapMidtransStatus, paymentRules } from "../src/modules/payment/payment.service.js";
 import { midtrans } from "../src/utils/midtrans.js";
 import { env } from "../src/config/env.js";
+import { formatRupiah } from "../src/utils/currency.js";
 
 vi.mock("../src/utils/mailer.js", () => ({ sendMail: vi.fn().mockResolvedValue(undefined) }));
 
@@ -102,6 +103,21 @@ describe("CartService", () => {
     const service = new CartService(repository as never);
 
     await expect(service.setItem(1n, { ticket_type_id: 2n, quantity: 1 })).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("formats cart prices as Rupiah", async () => {
+    const repository = { getCart: vi.fn().mockResolvedValue({ id: 1n, public_id: "c1", locks: [], items: [{ id: 2n, ticket_type_id: 3n, quantity: 2, unit_price: "150000.00", subtotal: "300000.00", ticketType: { id: 3n, name: "VIP", event: {} } }] }) };
+    const cart = await new CartService(repository as never).getCart(1n);
+
+    expect(cart).toMatchObject({ subtotal: 300000, subtotal_formatted: "Rp 300.000", items: [{ unit_price_formatted: "Rp 150.000", subtotal_formatted: "Rp 300.000" }] });
+    expect(formatRupiah(0)).toBe("Rp 0");
+  });
+
+  it("rejects cart item when its ticket wave is not open yet", async () => {
+    const repository = { upsertItem: vi.fn().mockResolvedValue({ reason: "wave_locked" }) };
+    const service = new CartService(repository as never);
+
+    await expect(service.setItem(1n, { ticket_type_id: 2n, quantity: 1 })).rejects.toThrow("Gelombang ini belum dibuka");
   });
 
   it("rejects checkout when its temporary ticket lock has expired", async () => {
@@ -401,6 +417,15 @@ describe("Cart rules", () => {
     expect(cartRules.isSellable(ticket, now)).toBe(true);
     expect(cartRules.isSellable({ ...ticket, event: { ...ticket.event, end_at: new Date("2026-11-01T00:00:00Z") } }, now)).toBe(false);
     expect(cartRules.isSellable({ ...ticket, event: { ...ticket.event, sales_end_at: new Date("2026-11-22T00:00:00Z") } }, now)).toBe(false);
+  });
+
+  it("opens the next wave only after every earlier wave is sold out, inactive, or past its sale window", () => {
+    const wave1 = { status: "active", quota: 10, sold: 10, sale_end_at: null };
+    expect(cartRules.isWaveOpen([], now)).toBe(true);
+    expect(cartRules.isWaveOpen([wave1], now)).toBe(true);
+    expect(cartRules.isWaveOpen([wave1, { ...wave1, sold: 9 }], now)).toBe(false);
+    expect(cartRules.isWaveOpen([{ ...wave1, sold: 9, status: "inactive" }], now)).toBe(true);
+    expect(cartRules.isWaveOpen([{ ...wave1, sold: 9, sale_end_at: new Date(now.getTime() - 1000) }], now)).toBe(true);
   });
 
   it("calculates totals with a capped percentage voucher", () => {

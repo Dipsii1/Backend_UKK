@@ -15,6 +15,7 @@ export type TicketTypeOutput = {
   name: string;
   description: string | null;
   price: number;
+  price_formatted: string;
   quota: number;
   sold: number;
   max_purchase: number;

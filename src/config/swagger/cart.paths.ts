@@ -56,7 +56,7 @@ export const cartPaths = {
       },
       responses: {
         "200": ok("Keranjang diperbarui"),
-        "409": ok("Kuota tidak mencukupi"),
+        "409": ok("Kuota tidak mencukupi atau gelombang tiket belum dibuka"),
       },
     },
   },

@@ -20,6 +20,13 @@ export type SellableTicket = {
   };
 };
 
+export type WaveTicket = {
+  status: string;
+  quota: number;
+  sold: number;
+  sale_end_at: Date | null;
+};
+
 export type VoucherSnapshot = {
   discount_type: "percentage" | "fixed";
   discount_value: number;
@@ -42,6 +49,7 @@ export type OrderTotals = {
 export type CartRules = {
   lockMinutes: number;
   isSellable(ticket: SellableTicket, now: Date): boolean;
+  isWaveOpen(previousWaves: WaveTicket[], now: Date): boolean;
   isVoucherUsable(voucher: VoucherSnapshot, usage: { total: number; byUser: number }, now: Date): boolean;
   calculateTotals(items: { price: number; quantity: number }[], voucher: VoucherSnapshot | null): OrderTotals;
 };
