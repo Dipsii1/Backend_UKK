@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { AdminController } from "./admin.controller.js";
+import { AnalyticsController } from "../analytics/analytics.controller.js";
 import { authenticate, authorize } from "../../middlewares/auth.middleware.js";
 import { validate } from "../../middlewares/error.middleware.js";
 import { requireNumericId } from "../../middlewares/security.middleware.js";
@@ -21,6 +22,7 @@ router.patch("/organizers/:id/status", requireNumericId, validate(organizerStatu
 
 // System monitoring
 router.get("/dashboard", AdminController.getDashboard);
+router.get("/dashboard/charts", AnalyticsController.getAdminCharts);
 router.get("/transaction-logs", AdminController.listTransactionLogs);
 
 export default router;

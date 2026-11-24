@@ -28,6 +28,7 @@ vi.mock("../src/modules/payment/payment.service.js", () => ({ PaymentService: se
 vi.mock("../src/modules/check-in/check-in.service.js", () => ({ CheckInService: services.fake("checkIn"), checkInRules: {} }));
 vi.mock("../src/modules/ticket/ticket.service.js", () => ({ TicketService: services.fake("ticket") }));
 vi.mock("../src/modules/notification/notification.service.js", () => ({ NotificationService: services.fake("notification") }));
+vi.mock("../src/modules/analytics/analytics.service.js", () => ({ AnalyticsService: services.fake("analytics") }));
 
 const { app } = await import("../src/index.js");
 
@@ -65,6 +66,7 @@ const cases: Case[] = [
   { role: "admin", method: "get", path: "/api/v1/admin/organizers", service: "admin.listOrganizers", status: 200 },
   { role: "admin", method: "patch", path: "/api/v1/admin/organizers/4/status", body: { status: "verified" }, service: "admin.updateOrganizerStatus", status: 200, args: [4n, "verified", ids.admin] },
   { role: "admin", method: "get", path: "/api/v1/admin/dashboard", service: "admin.getDashboard", status: 200 },
+  { role: "admin", method: "get", path: "/api/v1/admin/dashboard/charts?interval=week&start_date=2026-11-01&end_date=2026-11-30", service: "analytics.getAdminCharts", status: 200, args: [{ interval: "week", start_date: "2026-11-01", end_date: "2026-11-30" }] },
   { role: "admin", method: "get", path: "/api/v1/admin/transaction-logs?status=paid", service: "admin.listTransactionLogs", status: 200 },
   // Organizer
   { role: "organizer", method: "get", path: "/api/v1/organizer/event?page=2", service: "organizer.listEvents", status: 200, args: [ids.organizer, 2, 10] },
@@ -75,6 +77,7 @@ const cases: Case[] = [
   { role: "organizer", method: "post", path: "/api/v1/organizer/event/5/submit", service: "organizer.submitEvent", status: 200 },
   { role: "organizer", method: "get", path: "/api/v1/organizer/event/5/tickets", service: "organizer.listTickets", status: 200 },
   { role: "organizer", method: "get", path: "/api/v1/organizer/event/5/sales", service: "organizer.getSales", status: 200 },
+  { role: "organizer", method: "get", path: "/api/v1/organizer/dashboard/charts?event_id=5", service: "analytics.getOrganizerCharts", status: 200, args: [ids.organizer, { interval: "day", event_id: 5n }] },
   { role: "organizer", method: "get", path: "/api/v1/organizer/tickets/7", service: "organizer.getTicket", status: 200, args: [ids.organizer, 7n] },
   { role: "organizer", method: "post", path: "/api/v1/organizer/tickets", body: { event_id: "5", name: "VIP", price: 100000, quota: 10 }, service: "organizer.createTicket", status: 201 },
   { role: "organizer", method: "patch", path: "/api/v1/organizer/tickets/7", body: { quota: 20 }, service: "organizer.updateTicket", status: 200, args: [ids.organizer, 7n, { quota: 20 }] },
@@ -119,6 +122,16 @@ describe("Controllers via HTTP routes", () => {
     const response = await request(app).post("/api/v1/cart/checkout").set("Authorization", `Bearer ${tokenFor("buyer")}`).send({});
 
     expect(response.body.data).toMatchObject({ total: 116550, total_formatted: "Rp 116.550", service_fee_formatted: "Rp 5.000" });
+  });
+
+  it("rejects invalid chart query and sets private cache header", async () => {
+    const invalid = await request(app).get("/api/v1/admin/dashboard/charts?interval=year").set("Authorization", `Bearer ${tokenFor("admin")}`);
+    expect(invalid.status).toBe(400);
+    expect(services.fn("analytics.getAdminCharts")).not.toHaveBeenCalled();
+
+    services.fn("analytics.getOrganizerCharts").mockResolvedValue({ charts: {} });
+    const ok = await request(app).get("/api/v1/organizer/dashboard/charts").set("Authorization", `Bearer ${tokenFor("organizer")}`);
+    expect(ok.headers["cache-control"]).toBe("private, max-age=60");
   });
 
   it("blocks other roles before reaching the controller", async () => {

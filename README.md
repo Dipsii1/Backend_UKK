@@ -108,8 +108,11 @@ MIDTRANS_IS_PRODUCTION=false
 | `npx prisma migrate dev` | Jalankan migrasi |
 | `npx prisma generate` | Generate Prisma Client |
 | `npx prisma validate` | Validasi schema |
+| `npm run seed` | Isi data contoh (`prisma/seed.ts`) ke database yang sudah kosong |
 
 > Prisma Client di-generate ke `src/generated/prisma`.
+
+**Akun seed** (password semua `12345678`): `admin@ukk.test` (admin), `organizer@ukk.test` (organizer verified), `organizer2@ukk.test` (organizer pending), `buyer@ukk.test`, `buyer2@ukk.test`, `buyer3@ukk.test` (buyer). Seed hanya untuk database kosong (setelah `migrate reset`), tidak idempotent.
 
 ## 🏗️ Arsitektur
 
@@ -201,6 +204,7 @@ Alur status festival: `draft` → (`submit`) → `pending_review` → (admin app
 | `POST` | `/api/v1/organizer/event/:id/submit` | Ajukan festival `draft`/`rejected` (minimal satu tipe tiket) untuk direview admin |
 | `GET` | `/api/v1/organizer/event/:id/tickets` | Daftar tiket pada festival |
 | `GET` | `/api/v1/organizer/event/:id/sales` | Monitoring order paid, tiket terjual, pendapatan, dan kuota per tipe tiket |
+| `GET` | `/api/v1/organizer/dashboard/charts` | Data chart dashboard event milik sendiri (lihat [Chart Dashboard](#chart-dashboard)); filter opsional `event_id` |
 | `POST` | `/api/v1/organizer/tickets` | Buat tipe tiket, kuota, dan gelombang (`wave`); bisa saat festival `published` |
 | `GET`, `PATCH`, `DELETE` | `/api/v1/organizer/tickets/:id` | CRUD tiket dan manajemen kuota; kuota tidak boleh kurang dari penjualan |
 
@@ -270,6 +274,19 @@ Semua endpoint berikut memerlukan JWT dengan role `admin`. Perubahan status dan 
 | `PATCH` | `/api/v1/admin/organizers/:id/status` | Memperbarui status organizer (`pending`, `verified`, `rejected`, `suspended`) |
 | `GET` | `/api/v1/admin/dashboard` | Ringkasan user, organizer, event, pending approval, order paid, pendapatan, dan order terbaru |
 | `GET` | `/api/v1/admin/transaction-logs` | Log order/pembayaran dengan pagination dan filter status/rentang tanggal |
+| `GET` | `/api/v1/admin/dashboard/charts` | Data chart dashboard seluruh sistem (lihat [Chart Dashboard](#chart-dashboard)) |
+
+### Chart Dashboard
+
+`GET /admin/dashboard/charts` dan `GET /organizer/dashboard/charts` memakai kontrak yang sama:
+
+- **Query:** `start_date`, `end_date` (`YYYY-MM-DD`, WIB, inklusif; default 30 hari terakhir, maksimal 366 hari), `interval` = `day` | `week` (mulai Senin) | `month`. Organizer dapat menambah `event_id`.
+- **`meta`:** rentang, interval, `timezone: "Asia/Jakarta"`, `currency: "IDR"`, `previous_period`, `generated_at`.
+- **`summary`:** KPI `gross_sales`, `tickets_sold`, `paid_orders` berbentuk `{ value, previous, change_pct }` (dibanding periode sebelumnya dengan panjang sama; `change_pct` `null` bila sebelumnya 0).
+- **`charts`:** setiap chart berformat `{ type: "line"|"bar"|"donut", labels: [], series: [{ key, name, unit: "IDR"|"count", data: [] }] }` — langsung dipetakan ke Chart.js/ApexCharts/Recharts. Time series selalu lengkap per bucket (0 bila kosong); label donut memuat semua status enum.
+  - Admin: `sales_trend`, `order_status`, `top_events` (top 5), `user_growth` (buyer/organizer baru), `event_status`.
+  - Organizer: `sales_trend`, `order_status`, `top_events`, `ticket_type_sales` (terjual vs tersisa, top 10), `check_in` (status e-ticket), `event_status`. Tiga terakhir adalah snapshot terkini.
+- Penjualan = item order `paid` berdasarkan waktu settlement (sebelum diskon/biaya). Response di-cache browser `Cache-Control: private, max-age=60`.
 
 ### Notifikasi, Push & Realtime
 
@@ -339,6 +356,14 @@ Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock 
 `npm run test:coverage` mengukur `src/modules/**/*.{controller,service}.ts` dengan threshold minimal 80% untuk lines, functions, statements, dan branches. Controller diuji lewat route asli (`tests/controllers.test.ts`) dengan service di-mock; aturan bisnis service di `tests/service-rules.test.ts`.
 
 ## 📝 Changelog
+
+### 2026-11-24 — Chart dashboard admin & organizer
+- Modul baru `src/modules/analytics/` dengan endpoint `GET /api/v1/admin/dashboard/charts` dan `GET /api/v1/organizer/dashboard/charts`.
+- Kontrak chart seragam (`type`/`labels`/`series`), bucket WIB zero-fill (`day`/`week`/`month`), KPI dengan perbandingan periode sebelumnya, validasi rentang maks 366 hari, scoping organizer per event milik sendiri, `Cache-Control: private, max-age=60`, Swagger di `src/config/swagger/analytics.paths.ts`, test di `tests/analytics.test.ts`.
+
+### 2026-11-24 — Database seeder
+- `prisma/seed.ts` mengisi semua tabel: master data, user + profil (password `12345678`), organizer, kategori/tag/venue, event (published, berlangsung, pending review, draft, completed) beserta detailnya, ticket type bergelombang, seat map VIP, voucher, order paid/pending/expired + pembayaran, e-ticket (termasuk yang sudah check-in + scan log), cart aktif dengan ticket lock & reservasi kursi, notifikasi, push token, banner, audit & activity log.
+- Dijalankan via `npm run seed` (`migrations.seed` di `prisma.config.ts`).
 
 ### 2026-11-23 — Konsistensi modul seat map
 - Menyelaraskan struktur modul `seat-map` dengan modul lain: tipe input dipindah ke `seat-map.types.ts`, controller memisahkan parsing parameter, route dikelompokkan menjadi viewer publik, organizer, serta buyer, dan seluruh query/transaksi `SeatMapRepository`, schema validation, serta Swagger ditulis multiline dengan gaya yang seragam. Tidak ada perubahan kontrak API atau perilaku.

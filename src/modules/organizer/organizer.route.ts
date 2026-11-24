@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { OrganizerController } from "./organizer.controller.js";
+import { AnalyticsController } from "../analytics/analytics.controller.js";
 import { authenticate, authorize } from "../../middlewares/auth.middleware.js";
 import { validate } from "../../middlewares/error.middleware.js";
 import { requireNumericId } from "../../middlewares/security.middleware.js";
@@ -26,6 +27,7 @@ router.post("/event/:id/submit", requireNumericId, OrganizerController.submitEve
 // Tickets and sales monitoring
 router.get("/event/:id/tickets", requireNumericId, OrganizerController.listTickets);
 router.get("/event/:id/sales", requireNumericId, OrganizerController.getSales);
+router.get("/dashboard/charts", AnalyticsController.getOrganizerCharts);
 router.get("/tickets/:id", requireNumericId, OrganizerController.getTicket);
 router.post("/tickets", validate(ticketCreateSchema), OrganizerController.createTicket);
 router.patch("/tickets/:id", requireNumericId, validate(ticketUpdateSchema), OrganizerController.updateTicket);

@@ -11,6 +11,7 @@ import { paymentPaths } from "./swagger/payment.paths.js";
 import { ticketPaths } from "./swagger/ticket.paths.js";
 import { notificationPaths } from "./swagger/notification.paths.js";
 import { seatMapPaths } from "./swagger/seat-map.paths.js";
+import { analyticsPaths } from "./swagger/analytics.paths.js";
 
 const swaggerDocument = {
   openapi: "3.0.0",
@@ -29,7 +30,7 @@ const swaggerDocument = {
     { name: "Check-in", description: "Scan dan validasi QR e-ticket" },
     { name: "Seat maps", description: "Denah kursi organizer dan reservasi kursi buyer" },
   ],
-  paths: { ...healthPaths, ...authPaths, ...usersPaths, ...eventPaths, ...organizerPaths, ...adminPaths, ...cartPaths, ...paymentPaths, ...ticketPaths, ...notificationPaths, ...seatMapPaths },
+  paths: { ...healthPaths, ...authPaths, ...usersPaths, ...eventPaths, ...organizerPaths, ...adminPaths, ...cartPaths, ...paymentPaths, ...ticketPaths, ...notificationPaths, ...seatMapPaths, ...analyticsPaths },
   components: {
     securitySchemes: {
       bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
