@@ -18,6 +18,7 @@
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
     "validate": "prisma validate",
+    "seed": "prisma db seed",
     "postinstall": "prisma generate"
   },
   "devDependencies": {
