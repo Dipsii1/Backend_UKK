@@ -3,6 +3,8 @@ import { AuthController } from "./auth.controller.js";
 import { authenticate } from "../../middlewares/auth.middleware.js";
 import { validate } from "../../middlewares/error.middleware.js";
 import { rateLimit } from "../../middlewares/security.middleware.js";
+import { uploadDocuments } from "../../middlewares/upload.middleware.js";
+import { ORGANIZER_DOCUMENT_TYPES } from "../../utils/document-storage.js";
 import {
   loginSchema,
   refreshSchema,
@@ -19,7 +21,13 @@ const router = Router();
 
 // Public auth routes
 router.post("/register", rateLimit(15 * 60 * 1000, 10), validate(registerSchema), AuthController.register);
-router.post("/register-organizer", rateLimit(15 * 60 * 1000, 5), validate(registerOrganizerSchema), AuthController.registerOrganizer);
+router.post(
+  "/register-organizer",
+  rateLimit(15 * 60 * 1000, 5),
+  uploadDocuments(ORGANIZER_DOCUMENT_TYPES),
+  validate(registerOrganizerSchema),
+  AuthController.registerOrganizer,
+);
 router.post("/login", rateLimit(15 * 60 * 1000, 10), validate(loginSchema), AuthController.login);
 router.post("/refresh-token", rateLimit(15 * 60 * 1000, 30), validate(refreshSchema), AuthController.refreshToken);
 

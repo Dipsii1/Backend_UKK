@@ -28,6 +28,10 @@ const schema = z.object({
   MIDTRANS_IS_PRODUCTION: boolFromString,
   // Opsional: aktifkan bila "Enhanced Push Security" Expo dinyalakan.
   EXPO_ACCESS_TOKEN: z.string().min(1).optional(),
+  // Cloudinary: penyimpanan private berkas verifikasi organizer & event. Tanpa ini endpoint upload merespons 503.
+  CLOUDINARY_CLOUD_NAME: z.string().min(1).optional(),
+  CLOUDINARY_API_KEY: z.string().min(1).optional(),
+  CLOUDINARY_API_SECRET: z.string().min(1).optional(),
 });
 
 const parsed = schema.safeParse(process.env);

@@ -4,6 +4,7 @@ import { OrganizerService } from "./organizer.service.js";
 import { sendSuccess } from "../../utils/api-response.js";
 import { asyncHandler } from "../../utils/async-handler.js";
 import { paginationSchema, parseSchema } from "../../utils/validation.js";
+import { eventDocumentParamsSchema } from "./organizer.validation.js";
 
 const organizerService = new OrganizerService(new OrganizerRepository());
 
@@ -41,6 +42,20 @@ export class OrganizerController {
     const id = BigInt(req.params.id as string);
     const event = await organizerService.submitEvent(req.userId!, id);
     sendSuccess(res, event, "Festival berhasil diajukan untuk direview admin");
+  });
+
+  static listEventDocuments = asyncHandler(async (req: Request, res: Response) => {
+    const id = BigInt(req.params.id as string);
+    const documents = await organizerService.listEventDocuments(req.userId!, id);
+    sendSuccess(res, documents, "Berkas festival berhasil diambil");
+  });
+
+  static uploadEventDocument = asyncHandler(async (req: Request, res: Response) => {
+    const id = BigInt(req.params.id as string);
+    const { type } = parseSchema(eventDocumentParamsSchema, { type: req.params.type });
+    const file = (req.files as Record<string, Express.Multer.File[]>).file[0];
+    const document = await organizerService.uploadEventDocument(req.userId!, id, type, file);
+    sendSuccess(res, document, "Berkas festival berhasil diunggah");
   });
 
   static listTickets = asyncHandler(async (req: Request, res: Response) => {

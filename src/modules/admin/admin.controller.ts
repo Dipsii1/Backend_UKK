@@ -39,6 +39,18 @@ export class AdminController {
     sendSuccess(res, organizer, "Status organizer berhasil diperbarui");
   });
 
+  static getOrganizerDocuments = asyncHandler(async (req: Request, res: Response) => {
+    const id = BigInt(req.params.id as string);
+    const documents = await adminService.getOrganizerDocuments(id);
+    sendSuccess(res, documents, "Berkas organizer berhasil diambil");
+  });
+
+  static getEventDocuments = asyncHandler(async (req: Request, res: Response) => {
+    const id = BigInt(req.params.id as string);
+    const documents = await adminService.getEventDocuments(id);
+    sendSuccess(res, documents, "Berkas event berhasil diambil");
+  });
+
   static getDashboard = asyncHandler(async (_req: Request, res: Response) => {
     const dashboard = await adminService.getDashboard();
     sendSuccess(res, dashboard, "Dashboard sistem berhasil diambil");

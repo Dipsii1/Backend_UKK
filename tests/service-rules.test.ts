@@ -5,10 +5,14 @@ import { CartService } from "../src/modules/cart/cart.service.js";
 import { NotificationService } from "../src/modules/notification/notification.service.js";
 import { UserService } from "../src/modules/user/user.service.js";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../src/utils/app-error.js";
+import { documentStorage, EVENT_DOCUMENT_TYPES, ORGANIZER_DOCUMENT_TYPES } from "../src/utils/document-storage.js";
 
 vi.mock("../src/lib/socket.js", () => ({ emitToAll: vi.fn(), emitToRole: vi.fn(), emitToUser: vi.fn() }));
 
 const future = (hours: number) => new Date(Date.now() + hours * 3_600_000);
+const storedDocument = { type: "nib", storage_key: "ukk-2026/doc", format: "pdf", original_name: "doc.pdf", mime_type: "application/pdf", size: 10, created_at: new Date(), updated_at: null };
+const eventDocuments = EVENT_DOCUMENT_TYPES.map((type) => ({ ...storedDocument, type }));
+const organizerDocuments = ORGANIZER_DOCUMENT_TYPES.map((type) => ({ ...storedDocument, type }));
 
 describe("OrganizerService rules", () => {
   const verified = { id: 9n, status: "verified" };
@@ -30,6 +34,9 @@ describe("OrganizerService rules", () => {
       createTicket: vi.fn().mockResolvedValue({ id: 7n }),
       updateTicket: vi.fn().mockResolvedValue({ id: 7n }),
       deleteTicket: vi.fn(),
+      findEventDocuments: vi.fn().mockResolvedValue(eventDocuments),
+      findEventDocument: vi.fn().mockResolvedValue(null),
+      upsertEventDocument: vi.fn().mockResolvedValue(storedDocument),
       ...overrides,
     };
     return { repository, service: new OrganizerService(repository as never) };
@@ -78,6 +85,37 @@ describe("OrganizerService rules", () => {
     const { service, repository } = make({ findEventByIdAndOrganizer: vi.fn().mockResolvedValue({ ...draftEvent, ticketTypes: [{ sold: 0 }] }) });
     await service.submitEvent(1n, 5n);
     expect(repository.updateEvent).toHaveBeenCalledWith(5n, { status: "pending_review", rejected_reason: null });
+  });
+
+  it("requires every verification document before submitting for review", async () => {
+    const withTickets = { ...draftEvent, ticketTypes: [{ sold: 0 }] };
+    const { service, repository } = make({
+      findEventByIdAndOrganizer: vi.fn().mockResolvedValue(withTickets),
+      findEventDocuments: vi.fn().mockResolvedValue(eventDocuments.slice(1)),
+    });
+    await expect(service.submitEvent(1n, 5n)).rejects.toThrow("cooperation_agreement");
+    expect(repository.updateEvent).not.toHaveBeenCalled();
+  });
+
+  it("uploads event documents only while draft/rejected and replaces the old file", async () => {
+    const file = { buffer: Buffer.from("%PDF"), originalname: "pks.pdf", mimetype: "application/pdf", size: 4 };
+    const upload = vi.spyOn(documentStorage, "upload").mockResolvedValue({ storage_key: "new", format: "pdf", original_name: "pks.pdf", mime_type: "application/pdf", size: 4 });
+    const remove = vi.spyOn(documentStorage, "remove").mockResolvedValue(undefined);
+    vi.spyOn(documentStorage, "signedUrl").mockReturnValue("https://signed");
+
+    const submitted = make({ findEventByIdAndOrganizer: vi.fn().mockResolvedValue({ ...draftEvent, status: "pending_review" }) });
+    await expect(submitted.service.uploadEventDocument(1n, 5n, "cooperation_agreement", file)).rejects.toBeInstanceOf(ConflictError);
+    expect(upload).not.toHaveBeenCalled();
+
+    const { service, repository } = make({ findEventDocument: vi.fn().mockResolvedValue({ storage_key: "old" }) });
+    await expect(service.uploadEventDocument(1n, 5n, "cooperation_agreement", file)).resolves.toMatchObject({ url: "https://signed" });
+    expect(repository.upsertEventDocument).toHaveBeenCalledWith(5n, "cooperation_agreement", expect.objectContaining({ storage_key: "new" }));
+    expect(remove).toHaveBeenCalledWith("old");
+
+    remove.mockClear();
+    const failing = make({ upsertEventDocument: vi.fn().mockRejectedValue(new Error("db down")) });
+    await expect(failing.service.uploadEventDocument(1n, 5n, "cooperation_agreement", file)).rejects.toThrow("db down");
+    expect(remove).toHaveBeenCalledWith("new");
   });
 
   it("refuses to delete events with sold tickets or orders", async () => {
@@ -144,6 +182,8 @@ describe("AdminService rules", () => {
       setUserActive: vi.fn().mockResolvedValue({ id: 4n }),
       findOrganizers: vi.fn().mockResolvedValue({ data: [], total: 5 }),
       setOrganizerStatus: vi.fn().mockResolvedValue({ id: 4n }),
+      findOrganizerDocuments: vi.fn().mockResolvedValue({ id: 4n, documents: organizerDocuments }),
+      findEventDocuments: vi.fn().mockResolvedValue({ id: 5n, documents: eventDocuments }),
       getDashboard: vi.fn().mockResolvedValue({ users: 1 }),
       findTransactionLogs: vi.fn().mockResolvedValue({ data: [], total: 0 }),
       ...overrides,
@@ -155,6 +195,29 @@ describe("AdminService rules", () => {
     await expect(make({ approveEvent: vi.fn().mockResolvedValue(null) }).service.approveEvent(5n, 2n)).rejects.toBeInstanceOf(NotFoundError);
     await expect(make({ approveEvent: vi.fn().mockResolvedValue({ event: null, currentStatus: "draft" }) }).service.approveEvent(5n, 2n)).rejects.toBeInstanceOf(ConflictError);
     await expect(make({ approveEvent: vi.fn().mockResolvedValue({ event: null, currentStatus: "pending_review" }) }).service.approveEvent(5n, 2n)).rejects.toThrow("Organizer event belum terverifikasi");
+  });
+
+  it("requires complete documents to verify an organizer or approve an event", async () => {
+    const incomplete = make({ findOrganizerDocuments: vi.fn().mockResolvedValue({ id: 4n, documents: organizerDocuments.slice(1) }) });
+    await expect(incomplete.service.updateOrganizerStatus(4n, "verified", 2n)).rejects.toBeInstanceOf(ConflictError);
+    expect(incomplete.repository.setOrganizerStatus).not.toHaveBeenCalled();
+    await expect(incomplete.service.updateOrganizerStatus(4n, "suspended", 2n)).resolves.toEqual({ id: 4n });
+    await expect(make({ findOrganizerDocuments: vi.fn().mockResolvedValue(null) }).service.updateOrganizerStatus(4n, "verified", 2n)).rejects.toBeInstanceOf(NotFoundError);
+
+    const approve = vi.fn().mockResolvedValue({ event: null, currentStatus: "pending_review", organizerStatus: "verified", missingDocuments: true });
+    await expect(make({ approveEvent: approve }).service.approveEvent(5n, 2n)).rejects.toThrow("Berkas verifikasi event belum lengkap");
+  });
+
+  it("returns documents with signed URLs and 404 for unknown owners", async () => {
+    vi.spyOn(documentStorage, "signedUrl").mockReturnValue("https://signed");
+    const { service } = make();
+    const documents = await service.getOrganizerDocuments(4n);
+    expect(documents).toHaveLength(4);
+    expect(documents[0]).toMatchObject({ url: "https://signed" });
+    expect(documents[0]).not.toHaveProperty("storage_key");
+    await expect(service.getEventDocuments(5n)).resolves.toHaveLength(5);
+    await expect(make({ findEventDocuments: vi.fn().mockResolvedValue(null) }).service.getEventDocuments(5n)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(make({ findOrganizerDocuments: vi.fn().mockResolvedValue(null) }).service.getOrganizerDocuments(4n)).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it("paginates users and organizers", async () => {

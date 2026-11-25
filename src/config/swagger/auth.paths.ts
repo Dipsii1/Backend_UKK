@@ -128,14 +128,16 @@ export const authPaths = {
     post: {
       tags: ["Auth"],
       summary: "Daftar akun organizer",
-      description: "Mendaftarkan akun organizer langsung dari website. Akun organizer dibuat dengan status **pending**, wajib verifikasi email, dan memerlukan persetujuan admin sebelum dapat mengelola event.",
+      description:
+        "Mendaftarkan akun organizer langsung dari website (`multipart/form-data`). Akun organizer dibuat dengan status **pending**, wajib verifikasi email, dan memerlukan persetujuan admin sebelum dapat mengelola event. " +
+        "Wajib melampirkan berkas legalitas (PDF/JPG/PNG, maks 5 MB, tipe dicek dari isi file): `business_entity` (akta PT/CV), `nib`, `npwp`, `pic_ktp` (KTP penanggung jawab). Berkas disimpan private dan hanya dapat dilihat admin.",
       requestBody: {
         required: true,
         content: {
-          "application/json": {
+          "multipart/form-data": {
             schema: {
               type: "object",
-              required: ["email", "password", "fullName", "companyName", "slug"],
+              required: ["email", "password", "fullName", "companyName", "slug", "business_entity", "nib", "npwp", "pic_ktp"],
               properties: {
                 email: { type: "string", format: "email", example: "organizer@example.com" },
                 password: { type: "string", minLength: 8, maxLength: 72, example: "rahasia123" },
@@ -145,6 +147,10 @@ export const authPaths = {
                 phone: { type: "string", example: "081234567890" },
                 website: { type: "string", format: "uri", example: "https://contoh.com" },
                 description: { type: "string", maxLength: 2000, example: "Penyelenggara konser dan festival." },
+                business_entity: { type: "string", format: "binary", description: "PDF/JPG/PNG, maks 5 MB" },
+                nib: { type: "string", format: "binary", description: "PDF/JPG/PNG, maks 5 MB" },
+                npwp: { type: "string", format: "binary", description: "PDF/JPG/PNG, maks 5 MB" },
+                pic_ktp: { type: "string", format: "binary", description: "PDF/JPG/PNG, maks 5 MB" },
               },
             },
           },
@@ -152,6 +158,7 @@ export const authPaths = {
       },
       responses: {
         "201": { description: "Pendaftaran organizer berhasil dan menunggu persetujuan admin." },
+        "503": errorResponse("STORAGE_UNAVAILABLE", "Penyimpanan berkas belum dikonfigurasi", 503),
         "409": errorResponse("CONFLICT", "Email atau slug organizer sudah digunakan", 409),
         "400": validationErrorResponse,
       },

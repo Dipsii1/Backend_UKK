@@ -5,6 +5,7 @@ import { env } from "../../config/env.js";
 import { UserAuthRepository } from "./auth.repository.js";
 import { resetPasswordTemplate, verifyEmailTemplate } from "../../utils/email-templates.js";
 import { sendMail } from "../../utils/mailer.js";
+import { documentStorage } from "../../utils/document-storage.js";
 import {
   NotFoundError,
   ConflictError,
@@ -20,6 +21,7 @@ import type {
   RegisterResult,
   RegisterOrganizerInput,
   RegisterOrganizerResult,
+  OrganizerDocumentFiles,
   UpdateProfileInput,
   ResetPasswordInput,
   ResetPasswordResult,
@@ -86,7 +88,7 @@ export class AuthService {
     };
   }
 
-  async registerOrganizer(input: RegisterOrganizerInput): Promise<RegisterOrganizerResult> {
+  async registerOrganizer(input: RegisterOrganizerInput, files: OrganizerDocumentFiles): Promise<RegisterOrganizerResult> {
     const [existingEmail, existingSlug] = await Promise.all([
       this.userAuthRepo.findByEmail(input.email),
       this.userAuthRepo.findOrganizerBySlug(input.slug),
@@ -94,12 +96,18 @@ export class AuthService {
     if (existingEmail) throw new ConflictError("Email sudah terdaftar");
     if (existingSlug) throw new ConflictError("Slug organizer sudah digunakan");
 
+    // Berkas diunggah setelah cek duplikat agar request yang pasti gagal tidak meninggalkan file di storage.
+    const documents = await documentStorage.uploadAll(files, "organizer-documents");
     const verifyToken = crypto.randomBytes(32).toString("hex");
     const { user, organizer } = await this.userAuthRepo.createOrganizerUser({
       ...input,
       password: await hashPassword(input.password),
       verificationToken: hashToken(verifyToken),
       verificationExpiresAt: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS),
+      documents,
+    }).catch(async (error: unknown) => {
+      await documentStorage.removeAll(documents.map((document) => document.storage_key));
+      throw error;
     });
 
     await this.mailVerification(user.email, verifyToken);

@@ -1,7 +1,8 @@
 import { OrganizerRepository } from "./organizer.repository.js";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../../utils/app-error.js";
-import type { EventInput, TicketInput } from "./organizer.types.js";
+import type { EventDocumentType, EventInput, TicketInput } from "./organizer.types.js";
 import { toNumber } from "../../utils/currency.js";
+import { documentStorage, EVENT_DOCUMENT_TYPES, type DocumentFile } from "../../utils/document-storage.js";
 
 // Event hanya bisa diubah strukturnya sebelum diajukan / setelah ditolak.
 const EDITABLE_EVENT_STATUSES = ["draft", "rejected"];
@@ -92,7 +93,32 @@ export class OrganizerService {
     if (event.ticketTypes.length === 0) {
       throw new ConflictError("Festival harus memiliki minimal satu tipe tiket sebelum diajukan");
     }
+    const uploaded = new Set((await this.organizerRepo.findEventDocuments(eventId)).map((document) => document.type));
+    const missing = EVENT_DOCUMENT_TYPES.filter((type) => !uploaded.has(type));
+    if (missing.length > 0) {
+      throw new ConflictError(`Berkas verifikasi festival belum lengkap: ${missing.join(", ")}`);
+    }
     return this.organizerRepo.updateEvent(eventId, { status: "pending_review", rejected_reason: null });
+  }
+
+  async listEventDocuments(userId: bigint, eventId: bigint) {
+    await this.getEvent(userId, eventId);
+    const documents = await this.organizerRepo.findEventDocuments(eventId);
+    return documents.map(documentStorage.toOutput);
+  }
+
+  async uploadEventDocument(userId: bigint, eventId: bigint, type: EventDocumentType, file: DocumentFile) {
+    const event = await this.editableEvent(userId, eventId);
+    this.assertEditable(event.status);
+    const previous = await this.organizerRepo.findEventDocument(eventId, type);
+    const stored = await documentStorage.upload(file, "event-documents");
+    const document = await this.organizerRepo.upsertEventDocument(eventId, type, stored).catch(async (error: unknown) => {
+      await documentStorage.remove(stored.storage_key).catch(() => undefined);
+      throw error;
+    });
+    // shortcut: file lama dihapus best-effort; bila gagal tertinggal di Cloudinary. Tambah job cleanup bila volume besar.
+    if (previous) await documentStorage.remove(previous.storage_key).catch(() => undefined);
+    return documentStorage.toOutput(document);
   }
 
   async listTickets(userId: bigint, eventId: bigint) {

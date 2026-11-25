@@ -5,6 +5,8 @@ import { sendSuccess } from "../../utils/api-response.js";
 import { asyncHandler } from "../../utils/async-handler.js";
 import { ValidationError } from "../../utils/app-error.js";
 import { env } from "../../config/env.js";
+import { ORGANIZER_DOCUMENT_TYPES } from "../../utils/document-storage.js";
+import type { OrganizerDocumentFiles, OrganizerDocumentType } from "./auth.types.js";
 
 const authService = new AuthService(new UserAuthRepository());
 
@@ -31,7 +33,9 @@ export class AuthController {
   });
 
   static registerOrganizer = asyncHandler(async (req: Request, res: Response) => {
-    const result = await authService.registerOrganizer(req.body);
+    const files = req.files as Record<OrganizerDocumentType, Express.Multer.File[]>;
+    const documents: OrganizerDocumentFiles = ORGANIZER_DOCUMENT_TYPES.map((type) => [type, files[type][0]]);
+    const result = await authService.registerOrganizer(req.body, documents);
     sendSuccess(res, result, "Pendaftaran organizer berhasil", 201);
   });
 

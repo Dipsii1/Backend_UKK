@@ -26,7 +26,7 @@
       "name": "Auth",
       "item": [
         { "name": "Register", "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"email\": \"buyer@example.com\",\n  \"password\": \"password123\",\n  \"fullName\": \"Budi Santoso\"\n}" }, "url": "{{baseUrl}}/auth/register" } },
-        { "name": "Register Organizer", "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"email\": \"organizer@example.com\",\n  \"password\": \"password123\",\n  \"fullName\": \"Andi Pratama\",\n  \"companyName\": \"Andi Event Organizer\",\n  \"slug\": \"andi-event-organizer\",\n  \"phone\": \"081234567890\",\n  \"website\": \"https://contoh.com\",\n  \"description\": \"Penyelenggara konser dan festival\"\n}" }, "url": "{{baseUrl}}/auth/register-organizer" } },
+        { "name": "Register Organizer", "request": { "auth": { "type": "noauth" }, "method": "POST", "body": { "mode": "formdata", "formdata": [{ "key": "email", "value": "organizer@example.com", "type": "text" }, { "key": "password", "value": "password123", "type": "text" }, { "key": "fullName", "value": "Andi Pratama", "type": "text" }, { "key": "companyName", "value": "Andi Event Organizer", "type": "text" }, { "key": "slug", "value": "andi-event-organizer", "type": "text" }, { "key": "phone", "value": "081234567890", "type": "text" }, { "key": "website", "value": "https://contoh.com", "type": "text" }, { "key": "description", "value": "Penyelenggara konser dan festival", "type": "text" }, { "key": "business_entity", "type": "file", "src": [], "description": "Akta PT/CV (PDF/JPG/PNG, maks 5 MB)" }, { "key": "nib", "type": "file", "src": [], "description": "NIB" }, { "key": "npwp", "type": "file", "src": [], "description": "NPWP" }, { "key": "pic_ktp", "type": "file", "src": [], "description": "KTP penanggung jawab" }] }, "url": "{{baseUrl}}/auth/register-organizer" } },
         { "name": "Login", "event": [{ "listen": "test", "script": { "exec": ["const response = pm.response.json();", "if (response.data?.accessToken) pm.collectionVariables.set('accessToken', response.data.accessToken);"], "type": "text/javascript" } }], "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"password123\"\n}" }, "url": "{{baseUrl}}/auth/login" } },
         { "name": "Refresh Token", "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}" }, "url": "{{baseUrl}}/auth/refresh-token" } },
         { "name": "Logout", "request": { "method": "POST", "url": "{{baseUrl}}/auth/logout" } },
@@ -64,6 +64,8 @@
         { "name": "Get My Event", "request": { "method": "GET", "url": "{{baseUrl}}/organizer/event/{{eventId}}" } },
         { "name": "Update My Event", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"title\": \"UKK Music Fest 2026 Updated\"\n}" }, "url": "{{baseUrl}}/organizer/event/{{eventId}}" } },
         { "name": "Delete My Event", "request": { "method": "DELETE", "url": "{{baseUrl}}/organizer/event/{{eventId}}" } },
+        { "name": "List Event Documents", "request": { "method": "GET", "url": "{{baseUrl}}/organizer/event/{{eventId}}/documents" } },
+        { "name": "Upload Event Document", "request": { "method": "PUT", "description": "Ganti segmen terakhir dengan: cooperation_agreement, venue_permit, crowd_permit, artist_confirmation, liability_statement. Kelima berkas wajib ada sebelum submit.", "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": [] }] }, "url": "{{baseUrl}}/organizer/event/{{eventId}}/documents/cooperation_agreement" } },
         { "name": "Submit Event For Review", "request": { "method": "POST", "url": "{{baseUrl}}/organizer/event/{{eventId}}/submit" } },
         { "name": "List Event Tickets", "request": { "method": "GET", "url": "{{baseUrl}}/organizer/event/{{eventId}}/tickets" } },
         { "name": "Get Event Sales", "request": { "method": "GET", "url": "{{baseUrl}}/organizer/event/{{eventId}}/sales" } },
@@ -76,10 +78,12 @@
     {
       "name": "Admin",
       "item": [
+        { "name": "Get Event Documents", "request": { "method": "GET", "url": "{{baseUrl}}/admin/event/{{eventId}}/documents" } },
         { "name": "Approve Event", "request": { "method": "PUT", "url": "{{baseUrl}}/admin/event/{{eventId}}/approve" } },
         { "name": "List Managed Users", "request": { "method": "GET", "url": "{{baseUrl}}/admin/users?page=1&limit=10&search=budi&role=buyer&is_active=true" } },
         { "name": "Update User Status", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"is_active\": true\n}" }, "url": "{{baseUrl}}/admin/users/{{userId}}/status" } },
         { "name": "List Organizers", "request": { "method": "GET", "url": "{{baseUrl}}/admin/organizers?page=1&limit=10&status=pending" } },
+        { "name": "Get Organizer Documents", "request": { "method": "GET", "url": "{{baseUrl}}/admin/organizers/{{organizerId}}/documents" } },
         { "name": "Update Organizer Status", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"status\": \"verified\"\n}" }, "url": "{{baseUrl}}/admin/organizers/{{organizerId}}/status" } },
         { "name": "System Dashboard", "request": { "method": "GET", "url": "{{baseUrl}}/admin/dashboard" } },
         { "name": "Transaction Logs", "request": { "method": "GET", "url": "{{baseUrl}}/admin/transaction-logs?page=1&limit=10&status=paid&start_date=2026-01-01T00:00:00.000Z&end_date=2026-12-31T23:59:59.999Z" } }

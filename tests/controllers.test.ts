@@ -64,6 +64,8 @@ const cases: Case[] = [
   { role: "admin", method: "get", path: "/api/v1/admin/users?is_active=true", service: "admin.listUsers", status: 200 },
   { role: "admin", method: "patch", path: "/api/v1/admin/users/4/status", body: { is_active: false }, service: "admin.updateUserStatus", status: 200, args: [4n, false, ids.admin] },
   { role: "admin", method: "get", path: "/api/v1/admin/organizers", service: "admin.listOrganizers", status: 200 },
+  { role: "admin", method: "get", path: "/api/v1/admin/organizers/4/documents", service: "admin.getOrganizerDocuments", status: 200, args: [4n] },
+  { role: "admin", method: "get", path: "/api/v1/admin/event/5/documents", service: "admin.getEventDocuments", status: 200, args: [5n] },
   { role: "admin", method: "patch", path: "/api/v1/admin/organizers/4/status", body: { status: "verified" }, service: "admin.updateOrganizerStatus", status: 200, args: [4n, "verified", ids.admin] },
   { role: "admin", method: "get", path: "/api/v1/admin/dashboard", service: "admin.getDashboard", status: 200 },
   { role: "admin", method: "get", path: "/api/v1/admin/dashboard/charts?interval=week&start_date=2026-11-01&end_date=2026-11-30", service: "analytics.getAdminCharts", status: 200, args: [{ interval: "week", start_date: "2026-11-01", end_date: "2026-11-30" }] },
@@ -75,6 +77,7 @@ const cases: Case[] = [
   { role: "organizer", method: "patch", path: "/api/v1/organizer/event/5", body: { title: "Baru" }, service: "organizer.updateEvent", status: 200 },
   { role: "organizer", method: "delete", path: "/api/v1/organizer/event/5", service: "organizer.deleteEvent", status: 204 },
   { role: "organizer", method: "post", path: "/api/v1/organizer/event/5/submit", service: "organizer.submitEvent", status: 200 },
+  { role: "organizer", method: "get", path: "/api/v1/organizer/event/5/documents", service: "organizer.listEventDocuments", status: 200, args: [ids.organizer, 5n] },
   { role: "organizer", method: "get", path: "/api/v1/organizer/event/5/tickets", service: "organizer.listTickets", status: 200 },
   { role: "organizer", method: "get", path: "/api/v1/organizer/event/5/sales", service: "organizer.getSales", status: 200 },
   { role: "organizer", method: "get", path: "/api/v1/organizer/dashboard/charts?event_id=5", service: "analytics.getOrganizerCharts", status: 200, args: [ids.organizer, { interval: "day", event_id: 5n }] },
@@ -114,6 +117,18 @@ describe("Controllers via HTTP routes", () => {
     expect(response.status).toBe(status);
     expect(fn).toHaveBeenCalledTimes(1);
     if (args) expect(fn).toHaveBeenCalledWith(...args);
+  });
+
+  it("uploads one event document and validates the document type", async () => {
+    const upload = services.fn("organizer.uploadEventDocument").mockResolvedValue({ type: "venue_permit" });
+    const send = (type: string) =>
+      request(app).put(`/api/v1/organizer/event/5/documents/${type}`).set("Authorization", `Bearer ${tokenFor("organizer")}`)
+        .attach("file", Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]), { filename: "izin.png", contentType: "image/png" });
+
+    expect((await send("venue_permit")).status).toBe(200);
+    expect(upload).toHaveBeenCalledWith(ids.organizer, 5n, "venue_permit", expect.objectContaining({ originalname: "izin.png", mimetype: "image/png" }));
+    expect((await send("passport")).status).toBe(400);
+    expect(upload).toHaveBeenCalledTimes(1);
   });
 
   it("formats checkout money fields as Rupiah", async () => {

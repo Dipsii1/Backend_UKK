@@ -1,19 +1,26 @@
 import { prisma } from "../../lib/prisma.js";
 import type { OrganizerStatus, Prisma } from "../../generated/prisma/client.js";
 import type { OrganizerQuery, TransactionLogQuery, UserQuery } from "./admin.types.js";
+import { EVENT_DOCUMENT_TYPES } from "../../utils/document-storage.js";
 
 export class AdminRepository {
   async approveEvent(eventId: bigint, adminId: bigint) {
     return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const event = await tx.events.findUnique({
         where: { id: eventId },
-        include: { organizer: { select: { status: true } } },
+        include: {
+          organizer: { select: { status: true } },
+          _count: { select: { documents: true } },
+        },
       });
       if (!event) return null;
 
       // Precondition dicek di dalam transaksi agar status tidak berubah di antara cek dan update.
       if (event.status !== "pending_review" || event.organizer.status !== "verified") {
         return { event: null, currentStatus: event.status, organizerStatus: event.organizer.status };
+      }
+      if (event._count.documents < EVENT_DOCUMENT_TYPES.length) {
+        return { event: null, currentStatus: event.status, organizerStatus: event.organizer.status, missingDocuments: true };
       }
 
       const updated = await tx.events.update({
@@ -39,6 +46,20 @@ export class AdminRepository {
       });
 
       return { event: updated, currentStatus: event.status, organizerStatus: event.organizer.status };
+    });
+  }
+
+  async findOrganizerDocuments(id: bigint) {
+    return prisma.organizers.findUnique({
+      where: { id },
+      select: { id: true, documents: { orderBy: { type: "asc" } } },
+    });
+  }
+
+  async findEventDocuments(id: bigint) {
+    return prisma.events.findUnique({
+      where: { id },
+      select: { id: true, documents: { orderBy: { type: "asc" } } },
     });
   }
 

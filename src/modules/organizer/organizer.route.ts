@@ -4,6 +4,7 @@ import { AnalyticsController } from "../analytics/analytics.controller.js";
 import { authenticate, authorize } from "../../middlewares/auth.middleware.js";
 import { validate } from "../../middlewares/error.middleware.js";
 import { requireNumericId } from "../../middlewares/security.middleware.js";
+import { uploadDocuments } from "../../middlewares/upload.middleware.js";
 import {
   eventCreateSchema,
   eventUpdateSchema,
@@ -23,6 +24,10 @@ router.get("/event/:id", requireNumericId, OrganizerController.getEvent);
 router.patch("/event/:id", requireNumericId, validate(eventUpdateSchema), OrganizerController.updateEvent);
 router.delete("/event/:id", requireNumericId, OrganizerController.deleteEvent);
 router.post("/event/:id/submit", requireNumericId, OrganizerController.submitEvent);
+
+// Verification documents
+router.get("/event/:id/documents", requireNumericId, OrganizerController.listEventDocuments);
+router.put("/event/:id/documents/:type", requireNumericId, uploadDocuments(["file"]), OrganizerController.uploadEventDocument);
 
 // Tickets and sales monitoring
 router.get("/event/:id/tickets", requireNumericId, OrganizerController.listTickets);

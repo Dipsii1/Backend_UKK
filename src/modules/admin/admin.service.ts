@@ -2,6 +2,7 @@ import type { OrganizerStatus } from "../../generated/prisma/client.js";
 import { ConflictError, NotFoundError, ValidationError } from "../../utils/app-error.js";
 import { AdminRepository } from "./admin.repository.js";
 import { emitToAll } from "../../lib/socket.js";
+import { documentStorage, ORGANIZER_DOCUMENT_TYPES } from "../../utils/document-storage.js";
 import type { OrganizerQuery, TransactionLogQuery, UserQuery } from "./admin.types.js";
 
 export class AdminService {
@@ -12,6 +13,9 @@ export class AdminService {
     if (!result) throw new NotFoundError("Event tidak ditemukan");
     if (!result.event && result.currentStatus !== "pending_review") {
       throw new ConflictError("Hanya event dengan status pending_review yang dapat disetujui");
+    }
+    if (!result.event && result.missingDocuments) {
+      throw new ConflictError("Berkas verifikasi event belum lengkap");
     }
     if (!result.event) {
       throw new ConflictError("Organizer event belum terverifikasi");
@@ -51,9 +55,28 @@ export class AdminService {
   }
 
   async updateOrganizerStatus(id: bigint, status: OrganizerStatus, adminId: bigint) {
+    if (status === "verified") {
+      const organizer = await this.adminRepo.findOrganizerDocuments(id);
+      if (!organizer) throw new NotFoundError("Organizer tidak ditemukan");
+      if (organizer.documents.length < ORGANIZER_DOCUMENT_TYPES.length) {
+        throw new ConflictError("Berkas legalitas organizer belum lengkap");
+      }
+    }
     const organizer = await this.adminRepo.setOrganizerStatus(id, status, adminId);
     if (!organizer) throw new NotFoundError("Organizer tidak ditemukan");
     return organizer;
+  }
+
+  async getOrganizerDocuments(id: bigint) {
+    const organizer = await this.adminRepo.findOrganizerDocuments(id);
+    if (!organizer) throw new NotFoundError("Organizer tidak ditemukan");
+    return organizer.documents.map(documentStorage.toOutput);
+  }
+
+  async getEventDocuments(id: bigint) {
+    const event = await this.adminRepo.findEventDocuments(id);
+    if (!event) throw new NotFoundError("Event tidak ditemukan");
+    return event.documents.map(documentStorage.toOutput);
   }
 
   async getDashboard() {

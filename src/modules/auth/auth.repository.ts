@@ -1,6 +1,6 @@
 import { prisma } from "../../lib/prisma.js";
 import type { Prisma } from "../../generated/prisma/client.js";
-import type { UpdateProfileInput } from "./auth.types.js";
+import type { OrganizerDocumentData, UpdateProfileInput } from "./auth.types.js";
 
 export class UserAuthRepository {
   async findByEmail(email: string) {
@@ -84,6 +84,7 @@ export class UserAuthRepository {
     description?: string;
     verificationToken: string;
     verificationExpiresAt: Date;
+    documents: OrganizerDocumentData[];
   }) {
     return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const role = await tx.roles.upsert({
@@ -109,6 +110,10 @@ export class UserAuthRepository {
           website: data.website,
           description: data.description,
         },
+      });
+
+      await tx.organizer_documents.createMany({
+        data: data.documents.map((document) => ({ ...document, organizer_id: organizer.id })),
       });
 
       await tx.email_verifications.create({

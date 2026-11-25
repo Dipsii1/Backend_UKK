@@ -1,3 +1,9 @@
+import type { DocumentFile, ORGANIZER_DOCUMENT_TYPES, StoredDocument } from "../../utils/document-storage.js";
+
+export type OrganizerDocumentType = (typeof ORGANIZER_DOCUMENT_TYPES)[number];
+export type OrganizerDocumentFiles = [OrganizerDocumentType, DocumentFile][];
+export type OrganizerDocumentData = StoredDocument & { type: OrganizerDocumentType };
+
 export type RegisterInput = {
   email: string;
   password: string;
