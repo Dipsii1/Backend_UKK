@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const coordinate = z.coerce.number().int().min(0).max(100_000);
+export const SEAT_SHAPE_TYPES = ["stage", "standing", "entrance", "exit", "booth", "toilet", "bar", "text", "rect", "circle"] as const;
 const size = z.coerce.number().int().positive().max(100_000);
 
 export const seatMapSchema = z.object({
@@ -36,6 +37,22 @@ export const seatMapSchema = z.object({
     )
     .min(1)
     .max(10_000),
+  // Elemen non-kursi (panggung, pintu, fasilitas); opsional agar klien lama tetap valid.
+  shapes: z
+    .array(
+      z.object({
+        type: z.enum(SEAT_SHAPE_TYPES),
+        label: z.string().trim().max(100).optional(),
+        x: coordinate,
+        y: coordinate,
+        width: size,
+        height: size,
+        rotation: z.coerce.number().int().min(-360).max(360).default(0),
+        color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Warna harus berformat #RRGGBB").optional(),
+      }),
+    )
+    .max(500)
+    .default([]),
 });
 
 export const reserveSeatsSchema = z.object({

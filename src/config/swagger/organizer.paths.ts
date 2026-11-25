@@ -51,12 +51,17 @@ const eventBody = {
     "application/json": {
       schema: {
         type: "object",
-        required: ["category_id", "venue_id", "title", "slug", "start_at", "end_at"],
+        required: ["category_id", "venue", "title", "start_at", "end_at"],
         properties: {
           category_id: { type: "string", example: "1" },
-          venue_id: { type: "string", example: "1" },
+          venue: {
+            type: "object",
+            description: "Venue baru yang dibuat bersama event. Kota dipilih dari GET /organizer/cities.",
+            required: ["name", "city_id"],
+            properties: { name: { type: "string", example: "Lapangan Banteng" }, address: { type: "string", example: "Jl. Lapangan Banteng, Jakarta Pusat" }, city_id: { type: "string", example: "1" } },
+          },
           title: { type: "string", example: "UKK Music Fest 2026" },
-          slug: { type: "string", example: "ukk-music-fest-2026" },
+          slug: { type: "string", example: "ukk-music-fest-2026", description: "Opsional. Bila kosong dibuat dari judul (unik)." },
           start_at: { type: "string", format: "date-time" },
           end_at: { type: "string", format: "date-time" },
         },
@@ -82,6 +87,7 @@ const ticketBody = {
           sale_start_at: { type: "string", format: "date-time", description: "Mulai jual gelombang ini" },
           sale_end_at: { type: "string", format: "date-time", description: "Akhir jual gelombang ini" },
           status: { type: "string", enum: ["active", "sold_out", "inactive"] },
+          color: { type: "string", example: "#FF4D00", description: "Warna kelas tiket di denah (#RRGGBB)" },
         },
       },
     },
@@ -93,6 +99,9 @@ const response = (description: string, statusCode = 200) =>
 const id = idParam;
 
 export const organizerPaths = {
+  "/organizer/profile": { get: { tags: ["Organizer"], security: auth, summary: "Profil organizer (perusahaan, status verifikasi, kelengkapan berkas)", responses: { "200": response("Profil organizer"), "401": response("Autentikasi diperlukan", 401), "403": response("Bukan organizer", 403) } } },
+  "/organizer/categories": { get: { tags: ["Organizer"], security: auth, summary: "Daftar kategori event untuk form", responses: { "200": response("Daftar kategori"), "401": response("Autentikasi diperlukan", 401), "403": response("Khusus organizer", 403) } } },
+  "/organizer/cities": { get: { tags: ["Organizer"], security: auth, summary: "Daftar kota (dengan provinsi) untuk venue", responses: { "200": response("Daftar kota"), "401": response("Autentikasi diperlukan", 401), "403": response("Khusus organizer", 403) } } },
   "/organizer/event": { get: { tags: ["Organizer"], security: auth, summary: "Daftar festival milik organizer", parameters: [{ name: "page", in: "query", schema: { type: "integer", minimum: 1 } }, { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } }], responses: { "200": response("Daftar festival"), "401": response("Autentikasi diperlukan", 401), "403": response("Khusus organizer", 403) } }, post: { tags: ["Organizer"], security: auth, summary: "Buat festival", requestBody: eventBody, responses: { "201": response("Festival dibuat", 201), "400": response("Validasi gagal", 400) } } },
   "/organizer/event/{id}": { get: { tags: ["Organizer"], security: auth, summary: "Detail festival milik organizer", parameters: [id], responses: { "200": response("Detail festival"), "404": response("Festival tidak ditemukan", 404) } }, patch: { tags: ["Organizer"], security: auth, summary: "Perbarui festival (hanya status draft/rejected)", parameters: [id], requestBody: eventBody, responses: { "200": response("Festival diperbarui"), "400": response("Validasi gagal", 400), "409": response("Festival sudah diajukan/dipublikasikan", 409) } }, delete: { tags: ["Organizer"], security: auth, summary: "Hapus festival tanpa tiket terjual", parameters: [id], responses: { "204": { description: "Festival dihapus" }, "409": response("Festival memiliki tiket terjual/order atau sudah diajukan", 409) } } },
   "/organizer/event/{id}/submit": { post: { tags: ["Organizer"], security: auth, summary: "Ajukan festival draft/rejected untuk direview admin (status menjadi pending_review)", parameters: [id], responses: { "200": response("Festival diajukan"), "403": response("Organizer belum diverifikasi", 403), "404": response("Festival tidak ditemukan", 404), "409": response("Status festival tidak dapat diajukan, belum memiliki tiket, atau berkas verifikasi belum lengkap", 409) } } },

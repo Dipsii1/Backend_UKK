@@ -18,6 +18,12 @@ const router = Router();
 router.use(authenticate, authorize("organizer"));
 
 // Festival management
+router.get("/profile", OrganizerController.getProfile);
+
+// Master data untuk form event
+router.get("/categories", OrganizerController.listCategories);
+router.get("/cities", OrganizerController.listCities);
+
 router.get("/event", OrganizerController.listEvents);
 router.post("/event", validate(eventCreateSchema), OrganizerController.createEvent);
 router.get("/event/:id", requireNumericId, OrganizerController.getEvent);

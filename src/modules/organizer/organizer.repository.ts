@@ -8,6 +8,18 @@ export class OrganizerRepository {
     return prisma.organizers.findFirst({ where: { user_id: userId } });
   }
 
+  async findProfileByOwnerId(userId: bigint) {
+    return prisma.organizers.findFirst({
+      where: { user_id: userId },
+      select: {
+        public_id: true, company_name: true, slug: true, logo: true, email: true, phone: true, website: true,
+        description: true, address: true, status: true, verified_at: true, created_at: true,
+        owner: { select: { email: true } },
+        documents: { select: { type: true } },
+      },
+    });
+  }
+
   async findEvents(organizerId: bigint, page: number, limit: number) {
     const where = { organizer_id: organizerId };
     const [data, total] = await prisma.$transaction([
@@ -32,18 +44,48 @@ export class OrganizerRepository {
       where: { id, organizer_id: organizerId },
       include: {
         category: { select: { id: true, name: true, slug: true } },
-        venue: { select: { id: true, name: true } },
+        venue: { select: { id: true, name: true, address: true, city_id: true } },
         ticketTypes: true,
       },
     });
   }
 
-  async createEvent(data: Prisma.eventsUncheckedCreateInput) {
-    return prisma.events.create({ data });
+  async findCategories() {
+    return prisma.event_categories.findMany({ select: { id: true, name: true, slug: true }, orderBy: { name: "asc" } });
   }
 
-  async updateEvent(id: bigint, data: Prisma.eventsUncheckedUpdateInput) {
-    return prisma.events.update({ where: { id }, data });
+  async findCities() {
+    return prisma.cities.findMany({
+      select: { id: true, name: true, province: { select: { name: true } } },
+      orderBy: { name: "asc" },
+    });
+  }
+
+  async findCityById(id: bigint) {
+    return prisma.cities.findUnique({ where: { id }, select: { id: true } });
+  }
+
+  async isSlugTaken(table: "events" | "venues", slug: string) {
+    const count = table === "events"
+      ? await prisma.events.count({ where: { slug } })
+      : await prisma.venues.count({ where: { slug } });
+    return count > 0;
+  }
+
+  // Venue baru dan event dibuat dalam satu transaksi agar tidak ada venue yatim.
+  async createEvent(data: Omit<Prisma.eventsUncheckedCreateInput, "venue_id">, venue: Prisma.venuesUncheckedCreateInput) {
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const { id: venue_id } = await tx.venues.create({ data: venue, select: { id: true } });
+      return tx.events.create({ data: { ...data, venue_id } });
+    });
+  }
+
+  async updateEvent(id: bigint, data: Prisma.eventsUncheckedUpdateInput, venue?: Prisma.venuesUncheckedCreateInput) {
+    if (!venue) return prisma.events.update({ where: { id }, data });
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const { id: venue_id } = await tx.venues.create({ data: venue, select: { id: true } });
+      return tx.events.update({ where: { id }, data: { ...data, venue_id } });
+    });
   }
 
   // Hapus tipe tiket (beserta item cart yang mereferensikannya) lalu event, secara atomik.

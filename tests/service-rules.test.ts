@@ -37,11 +37,17 @@ describe("OrganizerService rules", () => {
       findEventDocuments: vi.fn().mockResolvedValue(eventDocuments),
       findEventDocument: vi.fn().mockResolvedValue(null),
       upsertEventDocument: vi.fn().mockResolvedValue(storedDocument),
+      findCityById: vi.fn().mockResolvedValue({ id: 3n }),
+      findProfileByOwnerId: vi.fn().mockResolvedValue({ company_name: "Nusantara Live", status: "verified", owner: { email: "rina@ukk.test" }, documents: [{ type: "nib" }] }),
+      isSlugTaken: vi.fn().mockResolvedValue(false),
+      findCategories: vi.fn().mockResolvedValue([{ id: 1n, name: "Musik", slug: "musik" }]),
+      findCities: vi.fn().mockResolvedValue([{ id: 3n, name: "Jakarta Selatan", province: { name: "DKI Jakarta" } }]),
       ...overrides,
     };
     return { repository, service: new OrganizerService(repository as never) };
   };
-  const eventInput = { category_id: 1n, venue_id: 1n, title: "Festival", slug: "festival", start_at: future(24), end_at: future(30) };
+  const venue = { name: "Lapangan Banteng", city_id: 3n };
+  const eventInput = { category_id: 1n, venue, title: "Festival", slug: "festival", start_at: future(24), end_at: future(30) };
 
   it("requires an organizer account, and a verified one for writes", async () => {
     await expect(make({ findByOwnerId: vi.fn().mockResolvedValue(null) }).service.listEvents(1n, 1, 10)).rejects.toBeInstanceOf(ForbiddenError);
@@ -66,7 +72,46 @@ describe("OrganizerService rules", () => {
     await expect(service.createEvent(1n, { ...eventInput, sales_start_at: future(5), sales_end_at: future(4) })).rejects.toBeInstanceOf(ValidationError);
     await expect(service.updateEvent(1n, 5n, { end_at: future(1) })).rejects.toBeInstanceOf(ValidationError);
     await service.createEvent(1n, eventInput);
-    expect(repository.createEvent).toHaveBeenCalledWith({ ...eventInput, organizer_id: 9n });
+    const { venue: _venue, ...event } = eventInput;
+    expect(repository.createEvent).toHaveBeenCalledWith({ ...event, organizer_id: 9n }, { ...venue, slug: "lapangan-banteng" });
+  });
+
+  it("generates unique slugs from the title and venue name", async () => {
+    const { service, repository } = make({ isSlugTaken: vi.fn().mockImplementation(async (table: string) => table === "events") });
+    const { slug: _slug, ...withoutSlug } = eventInput;
+    await service.createEvent(1n, { ...withoutSlug, title: "Jazz Malam Minggu!" });
+    const [event, newVenue] = repository.createEvent.mock.calls[0];
+    expect(event.slug).toMatch(/^jazz-malam-minggu-[0-9a-f]{6}$/);
+    expect(newVenue.slug).toBe("lapangan-banteng");
+    expect(repository.isSlugTaken).toHaveBeenCalledWith("events", "jazz-malam-minggu");
+
+    await service.createEvent(1n, { ...withoutSlug, title: "!!!", venue: { ...venue, name: "???" } });
+    expect(repository.createEvent.mock.calls[1][0].slug).toMatch(/^festival-/);
+    expect(repository.createEvent.mock.calls[1][1].slug).toBe("venue");
+  });
+
+  it("rejects an unknown city and creates a new venue when the venue changes", async () => {
+    const missingCity = make({ findCityById: vi.fn().mockResolvedValue(null) });
+    await expect(missingCity.service.createEvent(1n, eventInput)).rejects.toMatchObject({ errors: [{ field: "venue.city_id" }] });
+    expect(missingCity.repository.createEvent).not.toHaveBeenCalled();
+
+    const { service, repository } = make();
+    await service.updateEvent(1n, 5n, { venue: { name: "GBK", address: "Senayan", city_id: 3n } });
+    expect(repository.updateEvent).toHaveBeenCalledWith(5n, {}, { name: "GBK", address: "Senayan", city_id: 3n, slug: "gbk" });
+  });
+
+  it("returns the organizer profile with document completeness", async () => {
+    const profile = await make().service.getProfile(1n);
+    expect(profile).toMatchObject({ company_name: "Nusantara Live", status: "verified", account_email: "rina@ukk.test" });
+    expect(profile).not.toHaveProperty("owner");
+    expect(profile.documents).toEqual(ORGANIZER_DOCUMENT_TYPES.map((type) => ({ type, uploaded: type === "nib" })));
+    await expect(make({ findProfileByOwnerId: vi.fn().mockResolvedValue(null) }).service.getProfile(1n)).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it("lists categories and cities for the event form", async () => {
+    const { service } = make();
+    await expect(service.listCategories()).resolves.toEqual([{ id: 1n, name: "Musik", slug: "musik" }]);
+    await expect(service.listCities()).resolves.toHaveLength(1);
   });
 
   it("only edits, submits, or deletes events in draft/rejected", async () => {
@@ -76,7 +121,7 @@ describe("OrganizerService rules", () => {
 
     const { service, repository } = make();
     await service.updateEvent(1n, 5n, { title: "Baru" });
-    expect(repository.updateEvent).toHaveBeenCalledWith(5n, { title: "Baru" });
+    expect(repository.updateEvent).toHaveBeenCalledWith(5n, { title: "Baru" }, undefined);
   });
 
   it("requires at least one ticket type before submitting for review", async () => {

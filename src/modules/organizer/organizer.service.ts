@@ -1,8 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { OrganizerRepository } from "./organizer.repository.js";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../../utils/app-error.js";
-import type { EventDocumentType, EventInput, TicketInput } from "./organizer.types.js";
+import type { EventDocumentType, EventInput, TicketInput, VenueInput } from "./organizer.types.js";
 import { toNumber } from "../../utils/currency.js";
-import { documentStorage, EVENT_DOCUMENT_TYPES, type DocumentFile } from "../../utils/document-storage.js";
+import { documentStorage, EVENT_DOCUMENT_TYPES, ORGANIZER_DOCUMENT_TYPES, type DocumentFile } from "../../utils/document-storage.js";
+import { slugify } from "../../utils/slug.js";
 
 // Event hanya bisa diubah strukturnya sebelum diajukan / setelah ditolak.
 const EDITABLE_EVENT_STATUSES = ["draft", "rejected"];
@@ -45,6 +47,40 @@ export class OrganizerService {
     }
   }
 
+  // Bentrok slug jarang; sufiks acak menghindari loop query. Balapan tetap ditolak unique index (P2002 -> 409).
+  private async uniqueSlug(table: "events" | "venues", text: string) {
+    const base = slugify(text) || (table === "events" ? "festival" : "venue");
+    return (await this.organizerRepo.isSlugTaken(table, base)) ? `${base}-${randomUUID().slice(0, 6)}` : base;
+  }
+
+  private async venueData(venue: VenueInput) {
+    if (!(await this.organizerRepo.findCityById(venue.city_id))) {
+      throw new ValidationError("Kota tidak ditemukan", [{ field: "venue.city_id", message: "Kota tidak ditemukan" }]);
+    }
+    return { ...venue, slug: await this.uniqueSlug("venues", venue.name) };
+  }
+
+  // Profil organizer untuk halaman pengaturan; berkas hanya dilaporkan ada/tidak, tanpa URL.
+  async getProfile(userId: bigint) {
+    const profile = await this.organizerRepo.findProfileByOwnerId(userId);
+    if (!profile) throw new ForbiddenError("Akun ini belum terdaftar sebagai organizer");
+    const { owner, documents, ...organizer } = profile;
+    const uploaded = new Set(documents.map((document) => document.type));
+    return {
+      ...organizer,
+      account_email: owner.email,
+      documents: ORGANIZER_DOCUMENT_TYPES.map((type) => ({ type, uploaded: uploaded.has(type) })),
+    };
+  }
+
+  listCategories() {
+    return this.organizerRepo.findCategories();
+  }
+
+  listCities() {
+    return this.organizerRepo.findCities();
+  }
+
   async listEvents(userId: bigint, page: number, limit: number) {
     const organizer = await this.organizerFor(userId);
     const result = await this.organizerRepo.findEvents(organizer.id, page, limit);
@@ -61,7 +97,11 @@ export class OrganizerService {
   async createEvent(userId: bigint, data: EventInput) {
     const organizer = await this.organizerFor(userId, true);
     this.validateEventDates(data);
-    return this.organizerRepo.createEvent({ ...data, organizer_id: organizer.id });
+    const { venue, slug, ...event } = data;
+    return this.organizerRepo.createEvent(
+      { ...event, slug: slug ?? (await this.uniqueSlug("events", event.title)), organizer_id: organizer.id },
+      await this.venueData(venue),
+    );
   }
 
   async updateEvent(userId: bigint, eventId: bigint, data: Partial<EventInput>) {
@@ -73,7 +113,9 @@ export class OrganizerService {
       sales_start_at: data.sales_start_at ?? event.sales_start_at ?? undefined,
       sales_end_at: data.sales_end_at ?? event.sales_end_at ?? undefined,
     });
-    return this.organizerRepo.updateEvent(eventId, data);
+    // shortcut: venue yang diubah selalu dibuat baru; venue lama tetap tersimpan. Hapus venue yatim bila jumlahnya besar.
+    const { venue, ...changes } = data;
+    return this.organizerRepo.updateEvent(eventId, changes, venue && (await this.venueData(venue)));
   }
 
   async deleteEvent(userId: bigint, eventId: bigint) {

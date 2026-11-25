@@ -32,7 +32,8 @@ export class SeatMapService {
       throw new ForbiddenError("Tipe tiket pada denah bukan milik event ini");
     }
     if (result.reason === "used") throw new ConflictError("Denah yang sudah masuk checkout tidak dapat diganti");
-    return result.map;
+    // Kembalikan denah lengkap (area, kursi, elemen) agar editor bisa langsung memakai hasil simpan.
+    return this.seatMapRepo.findOrganizerMap(eventId, userId);
   }
 
   async reserve(userId: bigint, mapId: bigint, data: SeatReservationInput) {

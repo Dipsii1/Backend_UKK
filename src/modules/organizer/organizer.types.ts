@@ -1,10 +1,16 @@
 import type { EVENT_DOCUMENT_TYPES } from "../../utils/document-storage.js";
 
+export type VenueInput = {
+  name: string;
+  address?: string;
+  city_id: bigint;
+};
+
 export type EventInput = {
   category_id: bigint;
-  venue_id: bigint;
+  venue: VenueInput;
   title: string;
-  slug: string;
+  slug?: string;
   summary?: string;
   description?: string;
   banner?: string;
@@ -30,6 +36,7 @@ export type TicketInput = {
   sale_start_at?: Date;
   sale_end_at?: Date;
   status?: "active" | "sold_out" | "inactive";
+  color?: string;
 };
 
 export type EventDocumentType = (typeof EVENT_DOCUMENT_TYPES)[number];

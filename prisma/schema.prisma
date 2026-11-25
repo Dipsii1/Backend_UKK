@@ -86,6 +86,19 @@ enum TicketStatus {
   expired
 }
 
+enum SeatShapeType {
+  stage
+  standing
+  entrance
+  exit
+  booth
+  toilet
+  bar
+  text
+  rect
+  circle
+}
+
 enum SeatStatus {
   available
   held
@@ -672,6 +685,9 @@ model ticket_types {
 
   status TicketTypeStatus @default(active)
 
+  // Warna kelas tiket di denah (#RRGGBB); kosong = warna bawaan klien.
+  color String?
+
   created_at DateTime  @default(now())
   updated_at DateTime? @updatedAt
 
@@ -936,9 +952,29 @@ model seat_maps {
   created_at DateTime  @default(now())
   updated_at DateTime? @updatedAt
 
-  event    events          @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  event    events            @relation(fields: [event_id], references: [id], onDelete: Cascade)
   sections seat_sections[]
   seats    seats[]
+  shapes   seat_map_shapes[]
+}
+
+// Elemen non-kursi di denah: panggung, area berdiri, pintu, fasilitas, teks.
+model seat_map_shapes {
+  id          BigInt        @id @default(autoincrement())
+  seat_map_id BigInt
+  type        SeatShapeType
+  label       String?
+  x           Int
+  y           Int
+  width       Int
+  height      Int
+  rotation    Int           @default(0)
+  color       String?
+  sort_order  Int           @default(0)
+
+  seatMap seat_maps @relation(fields: [seat_map_id], references: [id], onDelete: Cascade)
+
+  @@index([seat_map_id])
 }
 
 model seat_sections {

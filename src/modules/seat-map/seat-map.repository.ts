@@ -4,6 +4,9 @@ import { toNumber } from "../../utils/currency.js";
 import { runSerializable } from "../cart/cart.repository.js";
 import type { SeatMapInput, SeatMapViewport } from "./seat-map.types.js";
 
+// Kursi beririsan dengan viewport bila x + width >= viewport.x; Prisma tidak bisa menjumlah kolom, jadi pakai margin.
+const SEAT_CULL_MARGIN = 200;
+
 export class SeatMapRepository {
   async expireStaleReservations() {
     return runSerializable(async (tx) => {
@@ -43,6 +46,8 @@ export class SeatMapRepository {
         sections: {
           orderBy: { sort_order: "asc" },
         },
+        shapes: { orderBy: { sort_order: "asc" } },
+        event: { select: { ticketTypes: { select: { id: true, name: true, color: true } } } },
         seats: {
           orderBy: [{ y: "asc" }, { x: "asc" }],
         },
@@ -53,9 +58,10 @@ export class SeatMapRepository {
   async findPublicMap(eventId: bigint, viewport: SeatMapViewport) {
     const seatWhere: Prisma.seatsWhereInput = {};
     if (viewport?.width !== undefined && viewport.height !== undefined) {
+      // shortcut: batas kiri/atas memakai margin ukuran kursi maksimum yang wajar; kursi lebih besar dari margin bisa terpotong di tepi.
       seatWhere.AND = [
-        { x: { lte: viewport.x! + viewport.width } },
-        { y: { lte: viewport.y! + viewport.height } },
+        { x: { gte: viewport.x! - SEAT_CULL_MARGIN, lte: viewport.x! + viewport.width } },
+        { y: { gte: viewport.y! - SEAT_CULL_MARGIN, lte: viewport.y! + viewport.height } },
       ];
     }
     return prisma.seat_maps.findFirst({
@@ -75,6 +81,8 @@ export class SeatMapRepository {
         sections: {
           orderBy: { sort_order: "asc" },
         },
+        shapes: { orderBy: { sort_order: "asc" } },
+        event: { select: { ticketTypes: { select: { id: true, name: true, color: true } } } },
         seats: {
           where: seatWhere,
           orderBy: [{ y: "asc" }, { x: "asc" }],
@@ -149,6 +157,10 @@ export class SeatMapRepository {
       if (used) return { reason: "used" as const };
       await tx.seats.deleteMany({ where: { seat_map_id: map.id } });
       await tx.seat_sections.deleteMany({ where: { seat_map_id: map.id } });
+      await tx.seat_map_shapes.deleteMany({ where: { seat_map_id: map.id } });
+      await tx.seat_map_shapes.createMany({
+        data: data.shapes.map((shape, index) => ({ ...shape, seat_map_id: map.id, sort_order: index })),
+      });
       const sections = await Promise.all(
         data.sections.map((section) =>
           tx.seat_sections.create({

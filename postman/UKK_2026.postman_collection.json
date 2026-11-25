@@ -60,7 +60,7 @@
       "name": "Organizer",
       "item": [
         { "name": "List My Events", "request": { "method": "GET", "url": "{{baseUrl}}/organizer/event?page=1&limit=10" } },
-        { "name": "Create Event", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"category_id\": \"1\",\n  \"venue_id\": \"1\",\n  \"title\": \"UKK Music Fest 2026\",\n  \"slug\": \"ukk-music-fest-2026\",\n  \"summary\": \"Festival musik tahunan\",\n  \"start_at\": \"2026-12-01T19:00:00.000Z\",\n  \"end_at\": \"2026-12-01T23:00:00.000Z\"\n}" }, "url": "{{baseUrl}}/organizer/event" } },
+        { "name": "Create Event", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"category_id\": \"1\",\n  \"venue\": { \"name\": \"Lapangan Banteng\", \"address\": \"Jakarta Pusat\", \"city_id\": \"1\" },\n  \"title\": \"UKK Music Fest 2026\",\n  \"summary\": \"Festival musik tahunan\",\n  \"start_at\": \"2026-12-01T19:00:00.000Z\",\n  \"end_at\": \"2026-12-01T23:00:00.000Z\"\n}" }, "url": "{{baseUrl}}/organizer/event" } },
         { "name": "Get My Event", "request": { "method": "GET", "url": "{{baseUrl}}/organizer/event/{{eventId}}" } },
         { "name": "Update My Event", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"title\": \"UKK Music Fest 2026 Updated\"\n}" }, "url": "{{baseUrl}}/organizer/event/{{eventId}}" } },
         { "name": "Delete My Event", "request": { "method": "DELETE", "url": "{{baseUrl}}/organizer/event/{{eventId}}" } },

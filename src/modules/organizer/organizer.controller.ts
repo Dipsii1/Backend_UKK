@@ -15,6 +15,18 @@ export class OrganizerController {
     sendSuccess(res, events, "Daftar festival berhasil diambil");
   });
 
+  static getProfile = asyncHandler(async (req: Request, res: Response) => {
+    sendSuccess(res, await organizerService.getProfile(req.userId!), "Profil organizer berhasil diambil");
+  });
+
+  static listCategories = asyncHandler(async (_req: Request, res: Response) => {
+    sendSuccess(res, await organizerService.listCategories(), "Daftar kategori berhasil diambil");
+  });
+
+  static listCities = asyncHandler(async (_req: Request, res: Response) => {
+    sendSuccess(res, await organizerService.listCities(), "Daftar kota berhasil diambil");
+  });
+
   static getEvent = asyncHandler(async (req: Request, res: Response) => {
     const id = BigInt(req.params.id as string);
     const event = await organizerService.getEvent(req.userId!, id);

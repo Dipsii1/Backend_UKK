@@ -55,7 +55,7 @@ type Case = {
 };
 
 const order = { id: 9n, subtotal: 100000, discount: 0, service_fee: 5000, tax: 11550, total: 116550 };
-const event = { category_id: "1", venue_id: "1", title: "Festival", slug: "festival", start_at: "2026-12-01T10:00:00Z", end_at: "2026-12-01T20:00:00Z" };
+const event = { category_id: "1", venue: { name: "GBK", city_id: "3" }, title: "Festival", start_at: "2026-12-01T10:00:00Z", end_at: "2026-12-01T20:00:00Z" };
 const notification = { order_id: "ORD-9", status_code: "200", gross_amount: "116550.00", signature_key: "a".repeat(128), transaction_status: "settlement" };
 
 const cases: Case[] = [
@@ -73,6 +73,9 @@ const cases: Case[] = [
   // Organizer
   { role: "organizer", method: "get", path: "/api/v1/organizer/event?page=2", service: "organizer.listEvents", status: 200, args: [ids.organizer, 2, 10] },
   { role: "organizer", method: "post", path: "/api/v1/organizer/event", body: event, service: "organizer.createEvent", status: 201 },
+  { role: "organizer", method: "get", path: "/api/v1/organizer/profile", service: "organizer.getProfile", status: 200, args: [ids.organizer] },
+  { role: "organizer", method: "get", path: "/api/v1/organizer/categories", service: "organizer.listCategories", status: 200 },
+  { role: "organizer", method: "get", path: "/api/v1/organizer/cities", service: "organizer.listCities", status: 200 },
   { role: "organizer", method: "get", path: "/api/v1/organizer/event/5", service: "organizer.getEvent", status: 200, args: [ids.organizer, 5n] },
   { role: "organizer", method: "patch", path: "/api/v1/organizer/event/5", body: { title: "Baru" }, service: "organizer.updateEvent", status: 200 },
   { role: "organizer", method: "delete", path: "/api/v1/organizer/event/5", service: "organizer.deleteEvent", status: 204 },

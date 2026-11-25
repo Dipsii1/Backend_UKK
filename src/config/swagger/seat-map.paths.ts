@@ -52,6 +52,22 @@ export const seatMapPaths = {
             schema: {
               type: "object",
               required: ["width", "height", "sections", "seats"],
+              properties: {
+                shapes: {
+                  type: "array",
+                  description: "Elemen non-kursi opsional (panggung, area berdiri, pintu, fasilitas, teks)",
+                  items: {
+                    type: "object",
+                    required: ["type", "x", "y", "width", "height"],
+                    properties: {
+                      type: { type: "string", enum: ["stage", "standing", "entrance", "exit", "booth", "toilet", "bar", "text", "rect", "circle"] },
+                      label: { type: "string", example: "Panggung" },
+                      rotation: { type: "integer", example: 0 },
+                      color: { type: "string", example: "#09090B" },
+                    },
+                  },
+                },
+              },
             },
           },
         },
