@@ -1,5 +1,7 @@
 import { prisma } from "../../lib/prisma.js";
 import type { Prisma } from "../../generated/prisma/client.js";
+import type { StoredDocument } from "../../utils/document-storage.js";
+import type { EventDocumentType } from "./organizer.types.js";
 
 export class OrganizerRepository {
   async findByOwnerId(userId: bigint) {
@@ -50,6 +52,27 @@ export class OrganizerRepository {
       await tx.cart_items.deleteMany({ where: { ticketType: { event_id: id } } });
       await tx.ticket_types.deleteMany({ where: { event_id: id } });
       await tx.events.delete({ where: { id } });
+    });
+  }
+
+  async findEventDocuments(eventId: bigint) {
+    return prisma.event_documents.findMany({
+      where: { event_id: eventId },
+      orderBy: { type: "asc" },
+    });
+  }
+
+  async findEventDocument(eventId: bigint, type: EventDocumentType) {
+    return prisma.event_documents.findUnique({
+      where: { event_id_type: { event_id: eventId, type } },
+    });
+  }
+
+  async upsertEventDocument(eventId: bigint, type: EventDocumentType, data: StoredDocument) {
+    return prisma.event_documents.upsert({
+      where: { event_id_type: { event_id: eventId, type } },
+      create: { ...data, event_id: eventId, type },
+      update: data,
     });
   }
 

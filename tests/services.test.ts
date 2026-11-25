@@ -13,6 +13,7 @@ import { PaymentService, mapMidtransStatus, paymentRules } from "../src/modules/
 import { midtrans } from "../src/utils/midtrans.js";
 import { env } from "../src/config/env.js";
 import { formatRupiah, toNumber } from "../src/utils/currency.js";
+import { EVENT_DOCUMENT_TYPES } from "../src/utils/document-storage.js";
 import { Prisma } from "../src/generated/prisma/client.js";
 
 vi.mock("../src/utils/mailer.js", () => ({ sendMail: vi.fn().mockResolvedValue(undefined) }));
@@ -387,6 +388,7 @@ describe("Organizer event workflow", () => {
     const repository = {
       findByOwnerId: vi.fn().mockResolvedValue({ id: 9n, status: "verified" }),
       findEventByIdAndOrganizer: vi.fn().mockResolvedValue(draftEvent),
+      findEventDocuments: vi.fn().mockResolvedValue(EVENT_DOCUMENT_TYPES.map((type) => ({ type }))),
       updateEvent: vi.fn().mockResolvedValue({ id: 3n, status: "pending_review" }),
     };
     const service = new OrganizerService(repository as never);

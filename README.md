@@ -75,6 +75,11 @@ TRUST_PROXY=false
 # Midtrans Snap (Sandbox)
 MIDTRANS_SERVER_KEY=SB-Mid-server-xxxxxxxx
 MIDTRANS_IS_PRODUCTION=false
+
+# Cloudinary (berkas verifikasi organizer & event, disimpan private)
+CLOUDINARY_CLOUD_NAME=nama-cloud
+CLOUDINARY_API_KEY=123456789012345
+CLOUDINARY_API_SECRET=rahasia
 ```
 
 | Variabel | Keterangan |
@@ -92,6 +97,7 @@ MIDTRANS_IS_PRODUCTION=false
 | `MIDTRANS_SERVER_KEY` | Server Key Midtrans (Snap API + verifikasi `signature_key` webhook). Tanpa ini endpoint pembayaran merespons `503` |
 | `MIDTRANS_IS_PRODUCTION` | `false` = Sandbox (`app.sandbox.midtrans.com`), `true` = Production |
 | `EXPO_ACCESS_TOKEN` | Opsional. Isi hanya bila *Enhanced Push Security* Expo aktif |
+| `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Kredensial Cloudinary untuk berkas verifikasi. Tanpa ini register organizer dan upload berkas event merespons `503` |
 
 ## 🚀 Menjalankan
 
@@ -160,7 +166,7 @@ Postman Collection seluruh endpoint tersedia di [`postman/UKK_2026.postman_colle
 | Method | Path | Keterangan |
 |:------:|------|------------|
 | `POST` | `/api/v1/auth/register` | Registrasi akun baru (role `buyer`) |
-| `POST` | `/api/v1/auth/register-organizer` | Registrasi organizer website (role `organizer`, status awal `pending`) |
+| `POST` | `/api/v1/auth/register-organizer` | Registrasi organizer website (`multipart/form-data`, role `organizer`, status awal `pending`) + 4 berkas legalitas wajib (lihat [Berkas Verifikasi](#berkas-verifikasi)) |
 | `POST` | `/api/v1/auth/login` | Login (`refresh_token` dikirim sebagai cookie) |
 | `POST` | `/api/v1/auth/refresh-token` | Refresh access token |
 | `POST` | `/api/v1/auth/logout` | Logout (butuh token) |
@@ -193,7 +199,7 @@ Postman Collection seluruh endpoint tersedia di [`postman/UKK_2026.postman_colle
 
 Semua endpoint berikut memerlukan JWT dengan role `organizer`; akses data juga dibatasi ke organizer pemilik festival. Operasi tulis (buat/ubah/hapus/ajukan) hanya untuk organizer berstatus `verified`.
 
-Alur status festival: `draft` → (`submit`) → `pending_review` → (admin approve) → `published`. Festival hanya bisa diubah atau dihapus saat berstatus `draft`/`rejected`; setelah diajukan, tiket hanya boleh diubah kuota/statusnya (harga terkunci). Tiket bisa ditambah saat `draft`/`rejected`, dan juga saat `published` (selama festival belum berakhir) untuk membuka **gelombang** baru.
+Alur status festival: `draft` → (upload 5 berkas verifikasi + `submit`) → `pending_review` → (admin approve) → `published`. Festival hanya bisa diubah atau dihapus saat berstatus `draft`/`rejected`; setelah diajukan, tiket hanya boleh diubah kuota/statusnya (harga terkunci). Tiket bisa ditambah saat `draft`/`rejected`, dan juga saat `published` (selama festival belum berakhir) untuk membuka **gelombang** baru.
 
 **Gelombang tiket:** setiap tipe tiket punya field `wave` (default `1`) dan jadwal jual sendiri `sale_start_at`/`sale_end_at`. Gelombang berikutnya otomatis terbuka saat **semua** tipe tiket gelombang sebelumnya di festival yang sama habis (`sold >= quota`), nonaktif, atau jadwal jualnya lewat — dan tetap harus berada dalam jadwal jualnya sendiri. Sebelum itu, `PUT` item cart ke gelombang tersebut ditolak `409`. Contoh: `{ "event_id": "1", "name": "Reguler", "wave": 2, "price": 150000, "quota": 200, "sale_start_at": "2026-12-01T00:00:00Z" }`. Daftar tiket diurutkan per gelombang.
 
@@ -201,7 +207,9 @@ Alur status festival: `draft` → (`submit`) → `pending_review` → (admin app
 |:------:|------|------------|
 | `GET`, `POST` | `/api/v1/organizer/event` | Daftar (pagination) dan buat festival |
 | `GET`, `PATCH`, `DELETE` | `/api/v1/organizer/event/:id` | CRUD festival; festival bertiket terjual atau memiliki order tidak dapat dihapus |
-| `POST` | `/api/v1/organizer/event/:id/submit` | Ajukan festival `draft`/`rejected` (minimal satu tipe tiket) untuk direview admin |
+| `POST` | `/api/v1/organizer/event/:id/submit` | Ajukan festival `draft`/`rejected` (minimal satu tipe tiket dan kelima berkas verifikasi) untuk direview admin |
+| `GET` | `/api/v1/organizer/event/:id/documents` | Daftar berkas verifikasi festival (signed URL 10 menit) |
+| `PUT` | `/api/v1/organizer/event/:id/documents/:type` | Unggah/ganti satu berkas verifikasi (field `file`) saat festival `draft`/`rejected` |
 | `GET` | `/api/v1/organizer/event/:id/tickets` | Daftar tiket pada festival |
 | `GET` | `/api/v1/organizer/event/:id/sales` | Monitoring order paid, tiket terjual, pendapatan, dan kuota per tipe tiket |
 | `GET` | `/api/v1/organizer/dashboard/charts` | Data chart dashboard event milik sendiri (lihat [Chart Dashboard](#chart-dashboard)); filter opsional `event_id` |
@@ -267,14 +275,34 @@ Semua endpoint berikut memerlukan JWT dengan role `admin`. Perubahan status dan 
 
 | Method | Path | Keterangan |
 |:------:|------|------------|
-| `PUT` | `/api/v1/admin/event/:id/approve` | Menyetujui event `pending_review` milik organizer `verified` dan mempublikasikannya |
+| `GET` | `/api/v1/admin/event/:id/documents` | Berkas verifikasi event (signed URL 10 menit) untuk direview sebelum approve |
+| `PUT` | `/api/v1/admin/event/:id/approve` | Menyetujui event `pending_review` milik organizer `verified` dengan berkas lengkap dan mempublikasikannya |
 | `GET` | `/api/v1/admin/users` | Daftar pengguna dengan pagination serta filter `search`, `role`, dan `is_active` |
 | `PATCH` | `/api/v1/admin/users/:id/status` | Mengaktifkan/menonaktifkan akun melalui body `{ "is_active": boolean }` |
 | `GET` | `/api/v1/admin/organizers` | Daftar organizer dengan pagination dan filter status |
-| `PATCH` | `/api/v1/admin/organizers/:id/status` | Memperbarui status organizer (`pending`, `verified`, `rejected`, `suspended`) |
+| `GET` | `/api/v1/admin/organizers/:id/documents` | Berkas legalitas organizer (signed URL 10 menit) |
+| `PATCH` | `/api/v1/admin/organizers/:id/status` | Memperbarui status organizer (`pending`, `verified`, `rejected`, `suspended`); `verified` ditolak `409` bila berkas legalitas belum lengkap |
 | `GET` | `/api/v1/admin/dashboard` | Ringkasan user, organizer, event, pending approval, order paid, pendapatan, dan order terbaru |
 | `GET` | `/api/v1/admin/transaction-logs` | Log order/pembayaran dengan pagination dan filter status/rentang tanggal |
 | `GET` | `/api/v1/admin/dashboard/charts` | Data chart dashboard seluruh sistem (lihat [Chart Dashboard](#chart-dashboard)) |
+
+### Berkas Verifikasi
+
+Untuk mencegah event fiktif, organizer dan event wajib melampirkan berkas (PDF/JPG/PNG, maks 5 MB). Tipe file dicek dari isi file (magic bytes), bukan dari ekstensi. Berkas disimpan sebagai file **private** di Cloudinary dan hanya bisa diakses lewat signed URL berumur 10 menit, yang diberikan ke admin (berkas organizer dan event) dan organizer pemilik (berkas event). Response tidak pernah memuat `storage_key`.
+
+| Tahap | Field / `type` | Berkas |
+|-------|----------------|--------|
+| Register organizer | `business_entity` | Akta pendirian PT/CV |
+| | `nib` | Nomor Induk Berusaha |
+| | `npwp` | NPWP badan |
+| | `pic_ktp` | KTP penanggung jawab |
+| Sebelum submit event | `cooperation_agreement` | Perjanjian Kerja Sama (PKS) bermeterai: harga tiket, fee, jadwal pencairan, mekanisme refund |
+| | `venue_permit` | Izin penggunaan venue dari pengelola |
+| | `crowd_permit` | Izin keramaian kepolisian (atau surat pengajuan izin + perjanjian sewa venue bila izin belum terbit) |
+| | `artist_confirmation` | Kontrak / surat konfirmasi artis atau line-up |
+| | `liability_statement` | Surat Pernyataan Tanggung Jawab Mutlak (SPTJM) |
+
+Admin hanya bisa memberi status organizer `verified` bila keempat berkas legalitas ada, dan hanya bisa approve event bila kelima berkas event ada (dicek di dalam transaksi approval).
 
 ### Chart Dashboard
 
@@ -356,6 +384,14 @@ Testing memakai Vitest, Supertest, dan `vitest-mock-extended`. Unit test memock 
 `npm run test:coverage` mengukur `src/modules/**/*.{controller,service}.ts` dengan threshold minimal 80% untuk lines, functions, statements, dan branches. Controller diuji lewat route asli (`tests/controllers.test.ts`) dengan service di-mock; aturan bisnis service di `tests/service-rules.test.ts`.
 
 ## 📝 Changelog
+
+### 2026-11-25 — Berkas verifikasi organizer & event
+- `POST /auth/register-organizer` kini `multipart/form-data` dan wajib melampirkan akta PT/CV, NIB, NPWP, serta KTP penanggung jawab. Berkas diunggah setelah cek duplikat email/slug; bila penulisan database gagal, file yang sudah terunggah dihapus kembali. **Breaking:** client lama yang mengirim JSON kini mendapat `400`.
+- Endpoint baru `GET /organizer/event/:id/documents` dan `PUT /organizer/event/:id/documents/:type` untuk PKS, izin venue, izin keramaian, konfirmasi artis, dan SPTJM (hanya saat `draft`/`rejected`; file lama dihapus saat diganti). Submit event ditolak `409` sampai kelima berkas ada.
+- Admin: `GET /admin/organizers/:id/documents` dan `GET /admin/event/:id/documents` (signed URL 10 menit). Status organizer `verified` dan approve event ditolak `409` bila berkas belum lengkap.
+- Tabel `organizer_documents` dan `event_documents` (unik per pemilik + jenis) lewat migrasi `20261125021338_add_verification_documents`. Migrasi ini juga menyelaraskan FK tabel seat map dengan schema dan memindah default `seats.public_id` ke Prisma Client (drift dari migrasi seat map yang ditulis manual).
+- Util `src/utils/document-storage.ts` (Cloudinary, tipe `private`) dan middleware `src/middlewares/upload.middleware.ts` (multer memory storage, maks 5 MB, validasi magic bytes PDF/JPG/PNG). Dependency baru `cloudinary`, `multer`; env baru `CLOUDINARY_*`. Swagger dan Postman diperbarui.
+- Catatan seed: organizer dan event hasil seed tidak memiliki berkas, sehingga `organizer2@ukk.test` dan event `pending_review` hasil seed tidak bisa diverifikasi/di-approve sebelum berkasnya diunggah.
 
 ### 2026-11-24 — Chart dashboard admin & organizer
 - Modul baru `src/modules/analytics/` dengan endpoint `GET /api/v1/admin/dashboard/charts` dan `GET /api/v1/organizer/dashboard/charts`.

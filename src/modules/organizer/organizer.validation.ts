@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { EVENT_DOCUMENT_TYPES } from "../../utils/document-storage.js";
 
 const optionalString = z.string().trim().min(1).optional();
 const optionalDate = z.coerce.date().optional();
@@ -38,3 +39,7 @@ export const ticketCreateSchema = z.object({
 });
 
 export const ticketUpdateSchema = ticketCreateSchema.omit({ event_id: true }).partial();
+
+export const eventDocumentParamsSchema = z.object({
+  type: z.enum(EVENT_DOCUMENT_TYPES),
+});

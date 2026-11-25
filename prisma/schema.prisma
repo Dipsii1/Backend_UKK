@@ -1,6 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
+  provider     = "prisma-client-js"
+  output       = "../src/generated/prisma"
   moduleFormat = "esm"
 }
 
@@ -22,6 +22,23 @@ enum OrganizerStatus {
   verified
   rejected
   suspended
+}
+
+// Legalitas penyelenggara, wajib saat register organizer.
+enum OrganizerDocumentType {
+  business_entity // akta pendirian PT/CV
+  nib
+  npwp
+  pic_ktp // KTP penanggung jawab
+}
+
+// Berkas verifikasi per event, wajib sebelum event diajukan.
+enum EventDocumentType {
+  cooperation_agreement // PKS / kontrak bermeterai
+  venue_permit // izin penggunaan venue
+  crowd_permit // izin keramaian kepolisian, atau surat pengajuan + sewa venue
+  artist_confirmation // kontrak / surat konfirmasi artis
+  liability_statement // SPTJM
 }
 
 enum EventStatus {
@@ -299,8 +316,9 @@ model organizers {
   created_at DateTime  @default(now())
   updated_at DateTime? @updatedAt
 
-  owner  users    @relation(fields: [user_id], references: [id])
-  events events[]
+  owner     users                 @relation(fields: [user_id], references: [id])
+  events    events[]
+  documents organizer_documents[]
 
   @@index([status])
 }
@@ -308,6 +326,45 @@ model organizers {
 // 
 // EVENT
 // 
+// File disimpan private di Cloudinary; storage_key = public_id.
+model organizer_documents {
+  id           BigInt                @id @default(autoincrement())
+  organizer_id BigInt
+  type         OrganizerDocumentType
+
+  storage_key   String
+  format        String
+  original_name String
+  mime_type     String
+  size          Int
+
+  created_at DateTime  @default(now())
+  updated_at DateTime? @updatedAt
+
+  organizer organizers @relation(fields: [organizer_id], references: [id], onDelete: Cascade)
+
+  @@unique([organizer_id, type])
+}
+
+model event_documents {
+  id       BigInt            @id @default(autoincrement())
+  event_id BigInt
+  type     EventDocumentType
+
+  storage_key   String
+  format        String
+  original_name String
+  mime_type     String
+  size          Int
+
+  created_at DateTime  @default(now())
+  updated_at DateTime? @updatedAt
+
+  event events @relation(fields: [event_id], references: [id], onDelete: Cascade)
+
+  @@unique([event_id, type])
+}
+
 model event_categories {
   id        BigInt @id @default(autoincrement())
   public_id String @unique @default(uuid())
@@ -403,6 +460,7 @@ model events {
   ticketScans    ticket_scans[]
   eventTags      event_tags[]
   ticketTypes    ticket_types[]
+  documents      event_documents[]
   seatMap        seat_maps?
 
   @@index([organizer_id])
@@ -617,11 +675,11 @@ model ticket_types {
   created_at DateTime  @default(now())
   updated_at DateTime? @updatedAt
 
-  event      events        @relation(fields: [event_id], references: [id])
-  cartItems  cart_items[]
-  locks      ticket_locks[]
-  orderItems order_items[]
-  tickets    tickets[]
+  event        events          @relation(fields: [event_id], references: [id])
+  cartItems    cart_items[]
+  locks        ticket_locks[]
+  orderItems   order_items[]
+  tickets      tickets[]
   seatSections seat_sections[]
   seats        seats[]
 
@@ -641,9 +699,9 @@ model carts {
   created_at DateTime  @default(now())
   updated_at DateTime? @updatedAt
 
-  user  users        @relation(fields: [user_id], references: [id])
-  items cart_items[]
-  locks ticket_locks[]
+  user             users               @relation(fields: [user_id], references: [id])
+  items            cart_items[]
+  locks            ticket_locks[]
   seatReservations seat_reservations[]
 }
 
@@ -675,7 +733,7 @@ model ticket_locks {
   quantity       Int
   expires_at     DateTime
 
-  created_at DateTime @default(now())
+  created_at DateTime  @default(now())
   updated_at DateTime? @updatedAt
 
   cart       carts        @relation(fields: [cart_id], references: [id], onDelete: Cascade)
@@ -706,11 +764,11 @@ model orders {
   created_at DateTime  @default(now())
   updated_at DateTime? @updatedAt
 
-  user          users            @relation(fields: [user_id], references: [id])
-  orderItems    order_items[]
-  voucherUsages voucher_usages[]
-  payments      payments[]
-  tickets       tickets[]
+  user             users               @relation(fields: [user_id], references: [id])
+  orderItems       order_items[]
+  voucherUsages    voucher_usages[]
+  payments         payments[]
+  tickets          tickets[]
   seatReservations seat_reservations[]
 
   @@index([user_id])
@@ -845,7 +903,7 @@ model tickets {
   status        TicketStatus @default(issued)
   checked_in_at DateTime?
   checked_in_by BigInt?
-  seat_id       BigInt? @unique
+  seat_id       BigInt?      @unique
 
   created_at DateTime  @default(now())
   updated_at DateTime? @updatedAt
@@ -856,7 +914,7 @@ model tickets {
   owner       users          @relation("ticketOwner", fields: [owner_id], references: [id])
   checkedInBy users?         @relation("ticketCheckedInBy", fields: [checked_in_by], references: [id], onDelete: SetNull)
   scans       ticket_scans[]
-  seat        seats? @relation(fields: [seat_id], references: [id])
+  seat        seats?         @relation(fields: [seat_id], references: [id])
 
   @@unique([order_item_id, sequence])
   @@index([order_id])
@@ -870,60 +928,60 @@ model tickets {
 // Structured geometry for an organizer's seat-map editor. The frontend renders
 // these primitives with Konva/SVG; SVG markup is intentionally not stored.
 model seat_maps {
-  id BigInt @id @default(autoincrement())
-  event_id BigInt @unique
-  width Int
-  height Int
-  version Int @default(1)
-  created_at DateTime @default(now())
+  id         BigInt    @id @default(autoincrement())
+  event_id   BigInt    @unique
+  width      Int
+  height     Int
+  version    Int       @default(1)
+  created_at DateTime  @default(now())
   updated_at DateTime? @updatedAt
 
-  event events @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  event    events          @relation(fields: [event_id], references: [id], onDelete: Cascade)
   sections seat_sections[]
-  seats seats[]
+  seats    seats[]
 }
 
 model seat_sections {
-  id BigInt @id @default(autoincrement())
-  seat_map_id BigInt
+  id             BigInt  @id @default(autoincrement())
+  seat_map_id    BigInt
   ticket_type_id BigInt?
-  label String
-  x Int
-  y Int
-  width Int
-  height Int
-  sort_order Int @default(0)
+  label          String
+  x              Int
+  y              Int
+  width          Int
+  height         Int
+  sort_order     Int     @default(0)
 
-  seatMap seat_maps @relation(fields: [seat_map_id], references: [id], onDelete: Cascade)
+  seatMap    seat_maps     @relation(fields: [seat_map_id], references: [id], onDelete: Cascade)
   ticketType ticket_types? @relation(fields: [ticket_type_id], references: [id], onDelete: SetNull)
-  seats seats[]
+  seats      seats[]
 
   @@index([seat_map_id])
   @@index([ticket_type_id])
 }
 
 model seats {
-  id BigInt @id @default(autoincrement())
-  public_id String @unique @default(uuid())
-  seat_map_id BigInt
-  section_id BigInt?
+  id             BigInt     @id @default(autoincrement())
+  public_id      String     @unique @default(uuid())
+  seat_map_id    BigInt
+  section_id     BigInt?
   ticket_type_id BigInt?
-  label String
-  row_label String?
-  seat_number Int?
-  x Int
-  y Int
-  width Int @default(32)
-  height Int @default(32)
-  status SeatStatus @default(available)
-  created_at DateTime @default(now())
-  updated_at DateTime? @updatedAt
+  label          String
+  row_label      String?
+  seat_number    Int?
+  x              Int
+  y              Int
+  width          Int        @default(32)
+  height         Int        @default(32)
+  status         SeatStatus @default(available)
+  created_at     DateTime   @default(now())
+  updated_at     DateTime?  @updatedAt
 
-  seatMap seat_maps @relation(fields: [seat_map_id], references: [id], onDelete: Cascade)
-  section seat_sections? @relation(fields: [section_id], references: [id], onDelete: SetNull)
-  ticketType ticket_types? @relation(fields: [ticket_type_id], references: [id], onDelete: SetNull)
+  seatMap     seat_maps          @relation(fields: [seat_map_id], references: [id], onDelete: Cascade)
+  section     seat_sections?     @relation(fields: [section_id], references: [id], onDelete: SetNull)
+  ticketType  ticket_types?      @relation(fields: [ticket_type_id], references: [id], onDelete: SetNull)
   reservation seat_reservations?
-  ticket tickets?
+  ticket      tickets?
 
   @@unique([seat_map_id, label])
   @@index([seat_map_id, status])
@@ -933,19 +991,19 @@ model seats {
 
 // A reservation lives in the buyer cart and is promoted to an order at checkout.
 model seat_reservations {
-  id BigInt @id @default(autoincrement())
-  seat_id BigInt @unique
-  cart_id BigInt?
-  order_id BigInt?
-  user_id BigInt
+  id         BigInt    @id @default(autoincrement())
+  seat_id    BigInt    @unique
+  cart_id    BigInt?
+  order_id   BigInt?
+  user_id    BigInt
   expires_at DateTime?
-  created_at DateTime @default(now())
+  created_at DateTime  @default(now())
   updated_at DateTime? @updatedAt
 
-  seat seats @relation(fields: [seat_id], references: [id], onDelete: Cascade)
-  cart carts? @relation(fields: [cart_id], references: [id], onDelete: Cascade)
+  seat  seats   @relation(fields: [seat_id], references: [id], onDelete: Cascade)
+  cart  carts?  @relation(fields: [cart_id], references: [id], onDelete: Cascade)
   order orders? @relation(fields: [order_id], references: [id], onDelete: SetNull)
-  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user  users   @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([cart_id])
   @@index([order_id])

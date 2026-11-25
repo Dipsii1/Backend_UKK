@@ -4,6 +4,7 @@ import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { env } from "../src/config/env.js";
 import { Prisma } from "../src/generated/prisma/client.js";
+import { documentStorage, ORGANIZER_DOCUMENT_TYPES } from "../src/utils/document-storage.js";
 
 const prismaMock = vi.hoisted(() => ({
   $transaction: vi.fn(),
@@ -11,6 +12,7 @@ const prismaMock = vi.hoisted(() => ({
   events: { findFirst: vi.fn(), findMany: vi.fn(), count: vi.fn() },
   roles: { upsert: vi.fn() },
   organizers: { findUnique: vi.fn(), create: vi.fn() },
+  organizer_documents: { createMany: vi.fn() },
   users: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn(), findMany: vi.fn(), count: vi.fn(), delete: vi.fn() },
   user_profiles: { create: vi.fn(), update: vi.fn(), upsert: vi.fn() },
   refresh_tokens: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
@@ -20,6 +22,10 @@ const prismaMock = vi.hoisted(() => ({
 
 vi.mock("../src/lib/prisma.js", () => ({ prisma: prismaMock }));
 vi.mock("../src/utils/mailer.js", () => ({ sendMail: vi.fn().mockResolvedValue(undefined) }));
+
+const pdf = Buffer.from("%PDF-1.4 test");
+const attachOrganizerDocuments = (req: request.Test) =>
+  ORGANIZER_DOCUMENT_TYPES.reduce((acc, type) => acc.attach(type, pdf, { filename: `${type}.pdf`, contentType: "application/pdf" }), req);
 
 const { app } = await import("../src/index.js");
 
@@ -104,15 +110,17 @@ describe("HTTP routes", () => {
     prismaMock.user_profiles.create.mockResolvedValue({});
     prismaMock.organizers.create.mockResolvedValue(createdOrganizer);
     prismaMock.email_verifications.create.mockResolvedValue({});
+    const upload = vi.spyOn(documentStorage, "upload").mockImplementation(async (file) => ({ storage_key: file.originalname, format: "pdf", original_name: file.originalname, mime_type: file.mimetype, size: file.size }));
 
-    const response = await request(app).post("/api/v1/auth/register-organizer").send({
-      email: "organizer@example.com",
-      password: "Password123!",
-      fullName: "Organizer One",
-      companyName: "Tixo Event",
-      slug: "tixo-event",
-      phone: "081234567890",
-    });
+    const response = await attachOrganizerDocuments(
+      request(app).post("/api/v1/auth/register-organizer")
+        .field("email", "organizer@example.com")
+        .field("password", "Password123!")
+        .field("fullName", "Organizer One")
+        .field("companyName", "Tixo Event")
+        .field("slug", "tixo-event")
+        .field("phone", "081234567890"),
+    );
 
     expect(response.status).toBe(201);
     expect(response.body.data).toMatchObject({
@@ -121,6 +129,40 @@ describe("HTTP routes", () => {
     });
     expect(prismaMock.roles.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { name: "organizer" } }));
     expect(JSON.stringify(response.body)).not.toContain("Password123!");
+    expect(upload).toHaveBeenCalledTimes(4);
+    expect(prismaMock.organizer_documents.createMany).toHaveBeenCalledWith({
+      data: ORGANIZER_DOCUMENT_TYPES.map((type) => expect.objectContaining({ organizer_id: 1n, type, storage_key: `${type}.pdf` })),
+    });
+  });
+
+  it("rejects organizer registration with missing or disguised documents before touching storage", async () => {
+    const upload = vi.spyOn(documentStorage, "upload");
+    const fields = (req: request.Test) => req.field("email", "organizer@example.com").field("password", "Password123!").field("fullName", "Organizer One").field("companyName", "Tixo Event").field("slug", "tixo-event");
+
+    const missing = await fields(request(app).post("/api/v1/auth/register-organizer"))
+      .attach("nib", pdf, { filename: "nib.pdf", contentType: "application/pdf" });
+    expect(missing.status).toBe(400);
+    expect(missing.body.errors).toEqual(expect.arrayContaining([{ field: "npwp", message: "Berkas wajib diunggah" }]));
+
+    const disguised = await fields(attachOrganizerDocuments(request(app).post("/api/v1/auth/register-organizer")))
+      .attach("pic_ktp", Buffer.from("MZ not a pdf"), { filename: "ktp.pdf", contentType: "application/pdf" });
+    expect(disguised.status).toBe(400);
+
+    expect(upload).not.toHaveBeenCalled();
+    expect(prismaMock.users.create).not.toHaveBeenCalled();
+  });
+
+  it("removes uploaded organizer documents when the database write fails", async () => {
+    vi.spyOn(documentStorage, "upload").mockImplementation(async (file) => ({ storage_key: file.originalname, format: "pdf", original_name: file.originalname, mime_type: file.mimetype, size: file.size }));
+    const remove = vi.spyOn(documentStorage, "remove").mockResolvedValue(undefined);
+    prismaMock.$transaction.mockRejectedValueOnce(new Error("db down"));
+
+    const response = await attachOrganizerDocuments(
+      request(app).post("/api/v1/auth/register-organizer").field("email", "organizer@example.com").field("password", "Password123!").field("fullName", "Organizer One").field("companyName", "Tixo Event").field("slug", "tixo-event"),
+    );
+
+    expect(response.status).toBe(500);
+    expect(remove).toHaveBeenCalledTimes(4);
   });
 
   it("returns conflict for registered email and generic unauthorized login errors", async () => {

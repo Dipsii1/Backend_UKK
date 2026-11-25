@@ -75,8 +75,8 @@ Backend_UKK/
     │   ├── notification/      # notifikasi user, Expo push token, broadcast admin
     │   ├── admin/             # approval event, manajemen akun, monitoring sistem
     │   └── analytics/         # data chart dashboard admin & organizer (route dipasang di admin/organizer router)
-    ├── middlewares/           # auth (JWT), role guard, validasi, error handler, rate limit, logger
-    └── utils/                 # response, app-error, validation (parseSchema, paginationSchema), mailer, midtrans
+    ├── middlewares/           # auth (JWT), role guard, validasi, error handler, rate limit, logger, upload berkas (multer)
+    └── utils/                 # response, app-error, validation (parseSchema, paginationSchema), mailer, midtrans, document-storage (Cloudinary)
 ```
 
 ### Konvensi Struktur `src/`
@@ -187,6 +187,7 @@ Jalankan dev server dan build sesuai script di `package.json` (jangan asumsikan 
 - **Token one-time**: token reset password dan verifikasi email disimpan sebagai hash, memiliki expiry, dan hanya boleh dikonsumsi sekali secara atomik. Reset password mencabut refresh token aktif pengguna.
 - **Notifikasi & realtime**: push memakai Expo Push (`utils/expo-push.ts`), realtime memakai Socket.IO (`lib/socket.ts`). Handshake socket wajib access token (`verifyAccessToken`) dan user aktif + email terverifikasi; client masuk room `user:<id>` dan `role:<name>`. Emit dilakukan **setelah** transaksi commit; payload tidak boleh berisi PII/token. `order:updated` hanya ke pemilik order. Broadcast hanya admin, wajib tercatat di audit log. Kegagalan push tidak boleh membatalkan notifikasi tersimpan; jangan log push token.
 - **Chart dashboard**: `GET /admin/dashboard/charts` (seluruh sistem) dan `GET /organizer/dashboard/charts` (hanya event milik organizer; `event_id` asing → 404). Kontrak chart `{ type, labels, series[{ key, name, unit, data }] }`, bucket zona `Asia/Jakarta` lewat `$queryRaw` berparameter, time series zero-fill, rentang maks 366 hari.
+- **Berkas verifikasi**: register organizer wajib 4 berkas legalitas (`business_entity`, `nib`, `npwp`, `pic_ktp`); event wajib 5 berkas (`cooperation_agreement`, `venue_permit`, `crowd_permit`, `artist_confirmation`, `liability_statement`) sebelum submit, hanya bisa diunggah/diganti saat `draft`/`rejected`. File via `uploadDocuments` (multer memory, maks 5 MB, tipe dari magic bytes) lalu `documentStorage` (Cloudinary `type: "private"`); akses hanya signed URL 10 menit, `storage_key` tidak pernah dikirim ke client. Admin `verified` organizer dan approve event (dicek di transaksi) ditolak bila berkas belum lengkap. Upload terjadi sebelum tulis DB; bila DB gagal, file dihapus kembali.
 - **Event publik**: endpoint publik hanya boleh mengembalikan event dengan `status = published` dan `is_published = true`.
 
 ---
